@@ -71,6 +71,7 @@ internal fun PlayerScreenRuntime.persistInternalSubtitlePreference(track: Subtit
             addonSubtitleUrl = null,
             addonSubtitleItemId = null,
             addonSubtitleAddonName = null,
+            addonSubtitleBingeGroup = null,
         )
     }
 }
@@ -86,6 +87,7 @@ internal fun PlayerScreenRuntime.persistAddonSubtitlePreference(subtitle: AddonS
             addonSubtitleUrl = subtitle.url,
             addonSubtitleItemId = subtitlePreferenceItemId,
             addonSubtitleAddonName = subtitle.addonName,
+            addonSubtitleBingeGroup = currentStreamBingeGroup?.trim()?.takeIf { it.isNotBlank() },
             subtitleIsForced = null,
         )
     }
@@ -135,6 +137,11 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                     preference = preference,
                     itemId = subtitlePreferenceItemId,
                 )
+                val carriesIntoCurrentItem = !belongsToCurrentItem && shouldCarryAddonSubtitleIntoItem(
+                    preference = preference,
+                    itemId = subtitlePreferenceItemId,
+                    currentBingeGroup = currentStreamBingeGroup,
+                )
                 if (belongsToCurrentItem && persistedUrl != null) {
                     selectedAddonSubtitleId = preference.addonSubtitleId ?: persistedUrl
                     selectedSubtitleIndex = -1
@@ -142,13 +149,17 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                     playerController?.setSubtitleUri(persistedUrl)
                     preferredSubtitleSelectionApplied = true
                     isUserExplicitSubtitleSelection = true
-                } else if (belongsToCurrentItem) {
+                } else if (belongsToCurrentItem || carriesIntoCurrentItem) {
                     val fetchKey = addonSubtitleFetchKey.takeUnless {
                         activeSourceUrl.startsWith("file:") && externalSubtitles.isNotEmpty()
                     }
                     if (fetchKey != null && autoFetchedAddonSubtitlesForKey != fetchKey) return false
 
-                    val subtitle = findPersistedAddonSubtitle(addonSubtitles, preference)
+                    val subtitle = if (carriesIntoCurrentItem) {
+                        findCarriedOverAddonSubtitle(addonSubtitles, preference)
+                    } else {
+                        findPersistedAddonSubtitle(addonSubtitles, preference)
+                    }
                     val canRestoreWhileLoading = subtitle != null && (
                         subtitle.url == preference.addonSubtitleUrl ||
                             preference.addonSubtitleAddonName.isNullOrBlank() ||

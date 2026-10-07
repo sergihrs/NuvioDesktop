@@ -9,10 +9,16 @@ data class PersistedPlayerTrackPreference(
     val addonSubtitleUrl: String? = null,
     val addonSubtitleItemId: String? = null,
     val addonSubtitleAddonName: String? = null,
+    val addonSubtitleBingeGroup: String? = null,
     val audioLanguage: String? = null,
     val audioName: String? = null,
     val audioTrackId: String? = null,
     val subtitleIsForced: Boolean? = null,
+)
+
+data class PersistedSeriesSubtitleDelay(
+    val delayMs: Int,
+    val bingeGroup: String,
 )
 
 object PersistedSubtitleSelectionType {
@@ -26,4 +32,6 @@ internal expect object PlayerTrackPreferenceStorage {
     fun save(contentId: String, preference: PersistedPlayerTrackPreference)
     fun loadSubtitleDelayMs(videoId: String): Int?
     fun saveSubtitleDelayMs(videoId: String, delayMs: Int)
+    fun loadSeriesSubtitleDelay(contentId: String): PersistedSeriesSubtitleDelay?
+    fun saveSeriesSubtitleDelay(contentId: String, delay: PersistedSeriesSubtitleDelay)
 }

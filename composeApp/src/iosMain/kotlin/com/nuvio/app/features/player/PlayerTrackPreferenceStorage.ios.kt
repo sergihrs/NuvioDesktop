@@ -12,11 +12,14 @@ internal actual object PlayerTrackPreferenceStorage {
     private const val addonSubtitleUrlKey = "addon_subtitle_url"
     private const val addonSubtitleItemIdKey = "addon_subtitle_item_id"
     private const val addonSubtitleAddonNameKey = "addon_subtitle_addon_name"
+    private const val addonSubtitleBingeGroupKey = "addon_subtitle_binge_group"
     private const val audioLanguageKey = "audio_language"
     private const val audioNameKey = "audio_name"
     private const val audioTrackIdKey = "audio_track_id"
     private const val subtitleIsForcedKey = "subtitle_is_forced"
     private const val subtitleDelayMsKey = "subtitle_delay_ms"
+    private const val seriesSubtitleDelayMsKey = "series_subtitle_delay_ms"
+    private const val seriesSubtitleDelayBingeGroupKey = "series_subtitle_delay_binge_group"
 
     actual fun load(contentId: String): PersistedPlayerTrackPreference? {
         val id = contentId.normalizedStorageId() ?: return null
@@ -29,6 +32,7 @@ internal actual object PlayerTrackPreferenceStorage {
             addonSubtitleUrl = loadString(addonSubtitleUrlKey, id),
             addonSubtitleItemId = loadString(addonSubtitleItemIdKey, id),
             addonSubtitleAddonName = loadString(addonSubtitleAddonNameKey, id),
+            addonSubtitleBingeGroup = loadString(addonSubtitleBingeGroupKey, id),
             audioLanguage = loadString(audioLanguageKey, id),
             audioName = loadString(audioNameKey, id),
             audioTrackId = loadString(audioTrackIdKey, id),
@@ -44,6 +48,7 @@ internal actual object PlayerTrackPreferenceStorage {
                 it.addonSubtitleUrl,
                 it.addonSubtitleItemId,
                 it.addonSubtitleAddonName,
+                it.addonSubtitleBingeGroup,
                 it.audioLanguage,
                 it.audioName,
                 it.audioTrackId,
@@ -61,6 +66,7 @@ internal actual object PlayerTrackPreferenceStorage {
         saveOptionalString(addonSubtitleUrlKey, id, preference.addonSubtitleUrl)
         saveOptionalString(addonSubtitleItemIdKey, id, preference.addonSubtitleItemId)
         saveOptionalString(addonSubtitleAddonNameKey, id, preference.addonSubtitleAddonName)
+        saveOptionalString(addonSubtitleBingeGroupKey, id, preference.addonSubtitleBingeGroup)
         saveOptionalString(audioLanguageKey, id, preference.audioLanguage)
         saveOptionalString(audioNameKey, id, preference.audioName)
         saveOptionalString(audioTrackIdKey, id, preference.audioTrackId)
@@ -84,6 +90,28 @@ internal actual object PlayerTrackPreferenceStorage {
             delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS).toLong(),
             forKey = scopedKey(subtitleDelayMsKey, id),
         )
+    }
+
+    actual fun loadSeriesSubtitleDelay(contentId: String): PersistedSeriesSubtitleDelay? {
+        val id = contentId.normalizedStorageId() ?: return null
+        val bingeGroup = loadString(seriesSubtitleDelayBingeGroupKey, id) ?: return null
+        val defaults = NSUserDefaults.standardUserDefaults
+        val delayKey = scopedKey(seriesSubtitleDelayMsKey, id)
+        if (defaults.objectForKey(delayKey) == null) return null
+        return PersistedSeriesSubtitleDelay(
+            delayMs = defaults.integerForKey(delayKey).toInt(),
+            bingeGroup = bingeGroup,
+        )
+    }
+
+    actual fun saveSeriesSubtitleDelay(contentId: String, delay: PersistedSeriesSubtitleDelay) {
+        val id = contentId.normalizedStorageId() ?: return
+        val bingeGroup = delay.bingeGroup.trim().takeIf { it.isNotBlank() } ?: return
+        NSUserDefaults.standardUserDefaults.setInteger(
+            delay.delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS).toLong(),
+            forKey = scopedKey(seriesSubtitleDelayMsKey, id),
+        )
+        saveOptionalString(seriesSubtitleDelayBingeGroupKey, id, bingeGroup)
     }
 
     private fun loadString(field: String, contentId: String): String? =

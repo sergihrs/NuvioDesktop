@@ -2,6 +2,9 @@ package com.nuvio.app.features.player
 
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.storage.DesktopStorage
+import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.streams.StreamBehaviorHints
+import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,6 +25,9 @@ class PlayerSubtitleSelectionRuntimeTest {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
     private val englishEpisodeOne = subtitle(episode = 1, language = "en", addonName = "Subs")
     private val frenchEpisodeOne = subtitle(episode = 1, language = "fr", addonName = "Subs")
+    private val englishEpisodeTwo = subtitle(episode = 2, language = "en", addonName = "Subs")
+    private val frenchEpisodeTwo = subtitle(episode = 2, language = "fr", addonName = "Subs")
+    private val otherFrenchEpisodeTwo = subtitle(episode = 2, language = "fr", addonName = "Other")
 
     @Before
     fun requireIsolatedStorage() {
@@ -50,6 +56,106 @@ class PlayerSubtitleSelectionRuntimeTest {
         assertTrue(runtime.isUserExplicitSubtitleSelection)
         assertEquals(frenchEpisodeOne.url, runtime.selectedAddonSubtitle?.url)
         assertEquals(listOf(englishEpisodeOne.url, frenchEpisodeOne.url), controller.subtitleUrls)
+    }
+
+    @Test
+    fun sameBingeGroupCarriesAddonAndLanguageIntoTheNextEpisode() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.persistAddonSubtitlePreference(frenchEpisodeOne)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        runtime.addonSubtitles = listOf(otherFrenchEpisodeTwo, englishEpisodeTwo, frenchEpisodeTwo)
+        runtime.refreshTracks()
+
+        assertEquals(listOf(frenchEpisodeTwo.url), controller.subtitleUrls)
+        assertTrue(runtime.isUserExplicitSubtitleSelection)
+    }
+
+    @Test
+    fun carriedSubtitleWaitsForTheSavedAddon() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.persistAddonSubtitlePreference(frenchEpisodeOne)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        runtime.addonSubtitles = listOf(otherFrenchEpisodeTwo, englishEpisodeTwo)
+        runtime.isLoadingAddonSubtitles = true
+        runtime.refreshTracks()
+
+        assertTrue(controller.subtitleUrls.isEmpty())
+
+        runtime.addonSubtitles = listOf(otherFrenchEpisodeTwo, englishEpisodeTwo, frenchEpisodeTwo)
+        runtime.refreshTracks()
+
+        assertEquals(listOf(frenchEpisodeTwo.url), controller.subtitleUrls)
+    }
+
+    @Test
+    fun missingSavedAddonFallsBackToThePreferredLanguage() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.persistAddonSubtitlePreference(frenchEpisodeOne)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        runtime.addonSubtitles = listOf(otherFrenchEpisodeTwo, englishEpisodeTwo)
+        runtime.refreshTracks()
+
+        assertEquals(listOf(englishEpisodeTwo.url), controller.subtitleUrls)
+    }
+
+    @Test
+    fun anotherBingeGroupKeepsThePreferredLanguageSelection() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.persistAddonSubtitlePreference(frenchEpisodeOne)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_B)
+        runtime.addonSubtitles = listOf(englishEpisodeTwo, frenchEpisodeTwo)
+        runtime.refreshTracks()
+
+        assertEquals(listOf(englishEpisodeTwo.url), controller.subtitleUrls)
+    }
+
+    @Test
+    fun subtitleDelayCarriesOnlyWithinTheSameBingeGroup() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.setSubtitleDelay(1_500)
+
+        advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        assertEquals(1_500, runtime.loadStartingSubtitleDelayMs())
+
+        runtime.currentStreamBingeGroup = GROUP_B
+        assertEquals(0, runtime.loadStartingSubtitleDelayMs())
+    }
+
+    @Test
+    fun episodeDelayWinsOverTheCarriedDelay() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        runtime.setSubtitleDelay(-400)
+
+        val episodeOne = runtime(bingeGroup = GROUP_A)
+        episodeOne.setSubtitleDelay(1_500)
+
+        val reopenedEpisodeTwo = runtime(bingeGroup = GROUP_A)
+        advanceToEpisodeTwo(reopenedEpisodeTwo, bingeGroup = GROUP_A)
+        assertEquals(-400, reopenedEpisodeTwo.loadStartingSubtitleDelayMs())
+    }
+
+    private fun advanceToEpisodeTwo(runtime: PlayerScreenRuntime, bingeGroup: String?): RecordingController {
+        runtime.switchToEpisodeStream(
+            StreamItem(
+                url = "https://example.com/episode-2.mp4",
+                addonName = "Test",
+                addonId = "test",
+                behaviorHints = StreamBehaviorHints(bingeGroup = bingeGroup),
+            ),
+            MetaVideo(id = "tt2026:1:2", title = "Episode 2", season = 1, episode = 2),
+        )
+        runtime.resetIdentityStateIfNeeded()
+        runtime.addonSubtitles = listOf(englishEpisodeTwo)
+        runtime.playbackSnapshot = PlayerPlaybackSnapshot(isLoading = false)
+        return RecordingController().also {
+            runtime.playerController = it
+            runtime.playerControllerSourceUrl = runtime.activeSourceUrl
+        }
     }
 
     private fun runtime(bingeGroup: String?) = PlayerScreenRuntime(
@@ -133,6 +239,9 @@ class PlayerSubtitleSelectionRuntimeTest {
     }
 
     companion object {
+        private const val GROUP_A = "addon|1080p|group-a"
+        private const val GROUP_B = "addon|2160p|group-b"
+
         private val temporaryRoot: Path =
             Paths.get(System.getProperty("java.io.tmpdir")).toAbsolutePath().normalize()
 

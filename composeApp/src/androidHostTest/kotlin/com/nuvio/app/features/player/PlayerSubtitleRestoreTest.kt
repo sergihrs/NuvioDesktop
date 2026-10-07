@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.compose.ui.Modifier
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.watchprogress.WatchProgressRepository
 import com.nuvio.app.features.watchprogress.WatchProgressStorage
@@ -165,6 +166,20 @@ class PlayerSubtitleRestoreTest {
     }
 
     @Test
+    fun anotherBingeGroupDoesNotCarryTheSavedAddonSubtitle() {
+        val runtime = runtime()
+        runtime.persistAddonSubtitlePreference(episodeOneSubtitle)
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = "addon|2160p|group-b")
+        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = "fr")
+        val french = episodeTwoSubtitle.copy(url = "https://example.com/episode-2-fr.srt", language = "fr")
+        runtime.addonSubtitles = listOf(episodeTwoSubtitle, french)
+
+        runtime.refreshTracks()
+
+        assertEquals(listOf(french.url), controller.subtitleUrls)
+    }
+
+    @Test
     fun disabledSubtitlesStayDisabledOnNextEpisode() {
         val runtime = runtime()
         runtime.persistInternalSubtitlePreference(null)
@@ -177,9 +192,17 @@ class PlayerSubtitleRestoreTest {
         assertTrue(runtime.isUserExplicitSubtitleSelection)
     }
 
-    private fun advanceToEpisodeTwo(runtime: PlayerScreenRuntime): RecordingController {
+    private fun advanceToEpisodeTwo(
+        runtime: PlayerScreenRuntime,
+        bingeGroup: String = BINGE_GROUP,
+    ): RecordingController {
         runtime.switchToEpisodeStream(
-            StreamItem(url = "https://example.com/episode-2.mp4", addonName = "Test", addonId = "test"),
+            StreamItem(
+                url = "https://example.com/episode-2.mp4",
+                addonName = "Test",
+                addonId = "test",
+                behaviorHints = StreamBehaviorHints(bingeGroup = bingeGroup),
+            ),
             MetaVideo(id = "tt2026:1:2", title = "Episode 2", season = 1, episode = 2),
         )
         runtime.resetIdentityStateIfNeeded()
@@ -203,7 +226,7 @@ class PlayerSubtitleRestoreTest {
             providerName = "Test",
             streamTitle = "Episode 1",
             streamSubtitle = null,
-            initialBingeGroup = null,
+            initialBingeGroup = BINGE_GROUP,
             pauseDescription = null,
             onBack = {},
             onOpenInExternalPlayer = null,
@@ -268,5 +291,9 @@ class PlayerSubtitleRestoreTest {
         override fun selectAudioTrack(index: Int) = Unit
         override fun clearExternalSubtitle() = Unit
         override fun clearExternalSubtitleAndSelect(trackIndex: Int) = Unit
+    }
+
+    private companion object {
+        const val BINGE_GROUP = "addon|1080p|group-a"
     }
 }
