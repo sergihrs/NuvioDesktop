@@ -28,9 +28,11 @@ import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.player.PlayerLaunch
 import com.nuvio.app.features.player.PlayerLaunchStore
 import com.nuvio.app.features.player.PlayerSettingsRepository
+import com.nuvio.app.features.player.SubtitleVideoParams
 import com.nuvio.app.features.player.resolveContentLanguage
 import com.nuvio.app.features.player.sanitizePlaybackHeaders
 import com.nuvio.app.features.player.sanitizePlaybackResponseHeaders
+import com.nuvio.app.features.player.toSubtitleVideoParams
 import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import com.nuvio.app.features.streams.StreamLaunchStore
@@ -198,6 +200,7 @@ internal fun StreamDestination(
             streamTitle = stream.streamLabel,
             streamSubtitle = stream.streamSubtitle,
             bingeGroup = stream.behaviorHints.bingeGroup,
+            subtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams(),
             pauseDescription = pauseDescription,
             providerName = stream.addonName,
             providerAddonId = stream.addonId,
@@ -321,6 +324,10 @@ internal fun StreamDestination(
                 streamTitle = cached.streamName,
                 streamSubtitle = null,
                 bingeGroup = cached.bingeGroup,
+                subtitleVideoParams = SubtitleVideoParams(
+                    videoSize = cached.videoSize,
+                    filename = cached.filename,
+                ).normalized(),
                 pauseDescription = pauseDescription,
                 providerName = cached.addonName,
                 providerAddonId = cached.addonId,
@@ -473,6 +480,7 @@ internal fun StreamDestination(
             streamTitle = stream.streamLabel,
             streamSubtitle = stream.streamSubtitle,
             bingeGroup = stream.behaviorHints.bingeGroup,
+            subtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams(),
             pauseDescription = pauseDescription,
             providerName = stream.addonName,
             providerAddonId = stream.addonId,
@@ -621,6 +629,7 @@ internal fun StreamDestination(
             streamTitle = stream.streamLabel,
             streamSubtitle = stream.streamSubtitle,
             bingeGroup = stream.behaviorHints.bingeGroup,
+            subtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams(),
             pauseDescription = pauseDescription,
             providerName = stream.addonName,
             providerAddonId = stream.addonId,

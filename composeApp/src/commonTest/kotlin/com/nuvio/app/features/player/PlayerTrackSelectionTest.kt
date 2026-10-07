@@ -384,16 +384,54 @@ class PlayerTrackSelectionTest {
         isForced = isForced,
     )
 
+    @Test
+    fun videoHashMatchesMoveToFrontKeepingRelativeOrder() {
+        val subtitles = listOf(
+            addonSubtitle(id = "a", language = "en"),
+            addonSubtitle(id = "b", language = "ro", isVideoHashMatch = true),
+            addonSubtitle(id = "c", language = "en"),
+            addonSubtitle(id = "d", language = "en", isVideoHashMatch = true),
+        )
+
+        assertEquals(listOf("b", "d", "a", "c"), subtitles.preferringVideoHashMatches().map { it.id })
+        val firstEnglish = subtitles.preferringVideoHashMatches().first {
+            SubtitleLanguageMatching.matchesLanguageCode(it.language, "en")
+        }
+        assertEquals("d", firstEnglish.id)
+    }
+
+    @Test
+    fun autoSelectedSubtitleIsReplacedByHashMatchInSameLanguageOnly() {
+        val selected = addonSubtitle(id = "plain", language = "en")
+        val subtitles = listOf(
+            addonSubtitle(id = "hash-ro", language = "ro", isVideoHashMatch = true),
+            selected,
+            addonSubtitle(id = "hash-en", language = "en", isVideoHashMatch = true),
+        )
+
+        assertEquals("hash-en", findVideoHashMatchedReplacement(selected, subtitles)?.id)
+        assertNull(findVideoHashMatchedReplacement(subtitles.last(), subtitles))
+        assertNull(findVideoHashMatchedReplacement(null, subtitles))
+        assertNull(
+            findVideoHashMatchedReplacement(
+                addonSubtitle(id = "plain-de", language = "de"),
+                subtitles,
+            ),
+        )
+    }
+
     private fun addonSubtitle(
         id: String,
         language: String,
         url: String = "https://example.com/$id.srt",
+        isVideoHashMatch: Boolean = false,
     ) = AddonSubtitle(
         id = id,
         url = url,
         language = language,
         display = id,
         addonName = "Addon",
+        isVideoHashMatch = isVideoHashMatch,
     )
 
     private fun addonSubtitlePreference(itemId: String?) = PersistedPlayerTrackPreference(

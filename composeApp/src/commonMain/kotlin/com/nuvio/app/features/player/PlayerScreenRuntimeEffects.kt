@@ -272,6 +272,15 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         fetchAddonSubtitlesForActiveItem()
     }
 
+    LaunchedEffect(subtitleHashSourceUrl) {
+        val url = subtitleHashSourceUrl ?: return@LaunchedEffect
+        computeSubtitleVideoHashAndRefresh(url)
+    }
+
+    LaunchedEffect(addonSubtitles, selectedAddonSubtitleId) {
+        tryReplaceAutoSelectedSubtitleWithVideoHashMatch()
+    }
+
     LaunchedEffect(playerController, playerControllerSourceUrl, activeSourceUrl, preferredAudioLanguageTargets) {
         if (playerControllerSourceUrl == activeSourceUrl) {
             applyPreferredAudioTrack(preferredAudioLanguageTargets)

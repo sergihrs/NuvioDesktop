@@ -302,6 +302,28 @@ internal fun addonSubtitleIsForced(subtitle: AddonSubtitle): Boolean {
         .any { value -> value.contains("forced", ignoreCase = true) }
 }
 
+/** Moves subtitles the addon matched by the video hash to the front, keeping the order otherwise. */
+internal fun List<AddonSubtitle>.preferringVideoHashMatches(): List<AddonSubtitle> =
+    if (none { it.isVideoHashMatch }) this else sortedByDescending { it.isVideoHashMatch }
+
+/**
+ * Returns a hash-matched subtitle that should replace the automatically selected [selected]
+ * addon subtitle: same language and forced flag, but timed for this exact file.
+ */
+internal fun findVideoHashMatchedReplacement(
+    selected: AddonSubtitle?,
+    subtitles: List<AddonSubtitle>,
+): AddonSubtitle? {
+    if (selected == null || selected.isVideoHashMatch) return null
+    val selectedIsForced = addonSubtitleIsForced(selected)
+    return subtitles.firstOrNull { subtitle ->
+        subtitle.isVideoHashMatch &&
+            subtitle.url != selected.url &&
+            addonSubtitleIsForced(subtitle) == selectedIsForced &&
+            SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, selected.language)
+    }
+}
+
 internal fun addonSubtitleMatchesLanguage(subtitle: AddonSubtitle, target: String): Boolean {
     if (SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, target)) return true
     val normalizedTarget = SubtitleLanguageMatching.normalizeLanguageCode(target)

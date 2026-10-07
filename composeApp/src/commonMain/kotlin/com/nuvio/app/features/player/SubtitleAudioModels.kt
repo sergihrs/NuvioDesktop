@@ -33,6 +33,8 @@ data class AddonSubtitle(
     val display: String,
     val addonName: String? = null,
     val isSelected: Boolean = false,
+    /** The addon matched this subtitle by the playing file's hash, so it is in sync with it. */
+    val isVideoHashMatch: Boolean = false,
 )
 
 internal enum class SubtitleTab {

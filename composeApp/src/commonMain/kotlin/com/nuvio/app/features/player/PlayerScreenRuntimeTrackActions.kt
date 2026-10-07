@@ -285,7 +285,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             return
         }
         if (matchedTargetPosition > 0 && !isLoadingAddonSubtitles) {
-            val primaryAddonMatch = addonSubtitles.firstOrNull { subtitle ->
+            val primaryAddonMatch = addonSubtitles.preferringVideoHashMatches().firstOrNull { subtitle ->
                 SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, selectionPlan.targets.first())
             }
             if (primaryAddonMatch != null) {
@@ -322,7 +322,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             return
         }
         val forcedAddonMatch = if (selectedAudioTrack != null) {
-            addonSubtitles.firstOrNull { subtitle ->
+            addonSubtitles.preferringVideoHashMatches().firstOrNull { subtitle ->
                 addonSubtitleIsForced(subtitle) &&
                     addonSubtitleMatchesLanguage(subtitle, requiredForcedTarget) &&
                     addonSubtitleMatchesSelectedAudioLanguage(subtitle, selectedAudioTrack)
@@ -363,7 +363,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
     if (playbackSnapshot.isLoading) return
 
     val addonMatch = selectionPlan.targets.firstNotNullOfOrNull { target ->
-        addonSubtitles.firstOrNull { subtitle ->
+        addonSubtitles.preferringVideoHashMatches().firstOrNull { subtitle ->
             (!subtitleStyle.useForcedSubtitles || !addonSubtitleIsForced(subtitle)) &&
                 SubtitleLanguageMatching.matchesLanguageCode(subtitle.language, target)
         }
@@ -378,6 +378,23 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
         disableAutomaticSubtitleSelection()
         preferredSubtitleSelectionApplied = true
     }
+}
+
+/**
+ * After a refetch with the video hash, swaps an automatically chosen addon subtitle for one the
+ * addon matched by hash (same language), since that one is in sync with this file.
+ * Never overrides a subtitle the user picked or restored.
+ */
+internal fun PlayerScreenRuntime.tryReplaceAutoSelectedSubtitleWithVideoHashMatch() {
+    if (isUserExplicitSubtitleSelection || !preferredSubtitleSelectionApplied) return
+    val replacement = findVideoHashMatchedReplacement(
+        selected = selectedAddonSubtitle,
+        subtitles = addonSubtitles,
+    ) ?: return
+    selectedAddonSubtitleId = replacement.selectionKey
+    selectedSubtitleIndex = -1
+    useCustomSubtitles = true
+    playerController?.setSubtitleUri(replacement.url)
 }
 
 private fun PlayerScreenRuntime.disableAutomaticSubtitleSelection() {

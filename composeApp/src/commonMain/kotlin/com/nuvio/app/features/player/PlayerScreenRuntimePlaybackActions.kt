@@ -111,6 +111,7 @@ internal fun PlayerScreenRuntime.currentLaunch(launch: PlayerLaunch): PlayerLaun
         torrentFileIdx = activeTorrentFileIdx,
         torrentFilename = activeTorrentFilename,
         torrentTrackers = activeTorrentTrackers,
+        subtitleVideoParams = activeSubtitleVideoParams,
         initialPositionMs = positionMs ?: activeInitialPositionMs,
         initialProgressFraction = activeInitialProgressFraction.takeIf { positionMs == null },
     )
