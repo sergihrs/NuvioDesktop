@@ -221,6 +221,11 @@ private fun PlayerScreenRuntime.restoreRememberedSubtitleChoice(choice: Persiste
             if (subtitle != null) {
                 showAddonSubtitle(selectionId = subtitle.selectionKey, url = subtitle.url)
                 markSubtitleChoiceRestored()
+                if (subtitle.isVideoHashMatch && !choice.isVideoHashMatch) {
+                    // The remembered delay was set for a subtitle not timed for this file; a hash
+                    // match is. Not recorded: the release keeps the user's last manual choice.
+                    applyStartingSubtitleDelayMs(loadStartingSubtitleDelayMs())
+                }
             }
         }
     }

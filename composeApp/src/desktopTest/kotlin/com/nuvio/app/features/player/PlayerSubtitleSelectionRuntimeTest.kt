@@ -298,6 +298,69 @@ class PlayerSubtitleSelectionRuntimeTest {
         assertEquals(listOf(englishEpisodeTwo.url), rememberedController.subtitleUrls)
     }
 
+    @Test
+    fun hashMatchRestoredForANonHashPickStartsWithoutTheRememberedDelay() {
+        val episodeOne = runtime(bingeGroup = GROUP_A)
+        episodeOne.handlePlayerControlsEvent(
+            "selectAddonSubtitle",
+            episodeOne.visibleAddonSubtitles.indexOfFirst { it.url == englishEpisodeOne.url }.toDouble(),
+        )
+        episodeOne.handlePlayerControlsEvent("subtitleDelayDelta", 1_000.0)
+
+        val hashMatch = englishEpisodeTwo.copy(url = "https://subs.example/episode-2-en-hash.srt", isVideoHashMatch = true)
+        val episodeTwo = runtime(bingeGroup = GROUP_A, episode = 2)
+        episodeTwo.addonSubtitles = listOf(englishEpisodeTwo, hashMatch)
+        episodeTwo.subtitleDelayMs = episodeTwo.loadStartingSubtitleDelayMs()
+        assertEquals(1_000, episodeTwo.subtitleDelayMs)
+        episodeTwo.refreshTracks()
+
+        assertEquals(hashMatch.url, episodeTwo.selectedAddonSubtitle?.url)
+        assertEquals(0, episodeTwo.subtitleDelayMs)
+        val remembered = PlayerTrackPreferenceStorage.loadReleaseSubtitleChoice("tt2026", GROUP_A)
+        assertEquals(false, remembered?.isVideoHashMatch)
+        assertEquals(1_000, remembered?.delayMs)
+
+        // Adjusting the delay now records the hash-matched subtitle with that delay.
+        episodeTwo.handlePlayerControlsEvent("subtitleDelayDelta", 250.0)
+        val updated = PlayerTrackPreferenceStorage.loadReleaseSubtitleChoice("tt2026", GROUP_A)
+        assertEquals(true, updated?.isVideoHashMatch)
+        assertEquals(250, updated?.delayMs)
+    }
+
+    @Test
+    fun hashMatchRestoredForAHashPickKeepsTheRememberedDelay() {
+        val hashEpisodeOne = englishEpisodeOne.copy(isVideoHashMatch = true)
+        val episodeOne = runtime(bingeGroup = GROUP_A)
+        episodeOne.persistAddonSubtitlePreference(hashEpisodeOne)
+        episodeOne.setSubtitleDelay(300)
+
+        val hashMatch = englishEpisodeTwo.copy(isVideoHashMatch = true)
+        val episodeTwo = runtime(bingeGroup = GROUP_A, episode = 2)
+        episodeTwo.addonSubtitles = listOf(hashMatch)
+        episodeTwo.subtitleDelayMs = episodeTwo.loadStartingSubtitleDelayMs()
+        episodeTwo.refreshTracks()
+
+        assertEquals(hashMatch.url, episodeTwo.selectedAddonSubtitle?.url)
+        assertEquals(300, episodeTwo.subtitleDelayMs)
+    }
+
+    @Test
+    fun episodeDelayWinsOverTheHashMatchReset() {
+        runtime(bingeGroup = GROUP_A).apply {
+            persistAddonSubtitlePreference(englishEpisodeOne)
+            setSubtitleDelay(1_000)
+        }
+        // A delay saved on episode 2 itself (for example in an earlier session).
+        PlayerTrackPreferenceStorage.saveSubtitleDelayMs("tt2026:1:2", -200)
+
+        val episodeTwo = runtime(bingeGroup = GROUP_A, episode = 2)
+        episodeTwo.addonSubtitles = listOf(englishEpisodeTwo.copy(isVideoHashMatch = true))
+        episodeTwo.subtitleDelayMs = episodeTwo.loadStartingSubtitleDelayMs()
+        episodeTwo.refreshTracks()
+
+        assertEquals(-200, episodeTwo.subtitleDelayMs)
+    }
+
     private fun embeddedTracks() = listOf(
         SubtitleTrack(index = 0, id = "3", label = "Signs", language = "eng"),
         SubtitleTrack(index = 1, id = "4", label = "en (subrip)", language = "eng"),
