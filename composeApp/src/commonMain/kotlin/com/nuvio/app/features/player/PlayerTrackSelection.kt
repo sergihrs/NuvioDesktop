@@ -165,7 +165,7 @@ internal fun findBestInternalSubtitleTrackIndex(
         val normalizedTarget = SubtitleLanguageMatching.normalizeLanguageCode(target)
         val candidateIndexes = tracks.indices.filter { index ->
             val track = tracks[index]
-            (!normalOnly || !track.isForced) && subtitleTrackMatchesLanguage(track, target)
+            (!normalOnly || track.isFullSubtitleTrack()) && subtitleTrackMatchesLanguage(track, target)
         }
         if (candidateIndexes.isEmpty()) {
             if (normalizedTarget == "pt-br") {
@@ -181,7 +181,7 @@ internal fun findBestInternalSubtitleTrackIndex(
             continue
         }
 
-        val preferredCandidateIndexes = candidateIndexes.filter { index -> !tracks[index].isForced }
+        val preferredCandidateIndexes = candidateIndexes.filter { index -> tracks[index].isFullSubtitleTrack() }
             .takeIf { it.isNotEmpty() }
             ?: if (normalOnly) {
                 continue
@@ -216,6 +216,26 @@ internal fun findBestInternalSubtitleTrackIndex(
     }
     return -1
 }
+
+private val PartialSubtitleTitlePattern = Regex(
+    "\\b(signs?|songs?|commentary|karaoke|lyrics)\\b",
+    RegexOption.IGNORE_CASE,
+)
+private val FullSubtitleTitlePattern = Regex("\\b(full|dialogues?)\\b", RegexOption.IGNORE_CASE)
+
+/**
+ * Whether an embedded track's title marks it as covering only part of the dialogue (signs,
+ * songs, karaoke) or something other than it (commentary), unless it also says it is the full
+ * one ("Full + Songs"). Forced tracks are flagged separately. mpv does not expose the container's
+ * per-track statistics (line counts), so the title is all there is to go on; untitled tracks count
+ * as full subtitles.
+ */
+internal fun isPartialSubtitleTrack(track: SubtitleTrack): Boolean =
+    PartialSubtitleTitlePattern.containsMatchIn(track.label) &&
+        !FullSubtitleTitlePattern.containsMatchIn(track.label)
+
+/** A full subtitle for the dialogue: neither forced nor a signs/songs/commentary track. */
+internal fun SubtitleTrack.isFullSubtitleTrack(): Boolean = !isForced && !isPartialSubtitleTrack(this)
 
 internal fun findBestForcedSubtitleTrackIndex(
     tracks: List<SubtitleTrack>,
