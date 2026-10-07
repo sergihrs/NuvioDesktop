@@ -154,7 +154,11 @@ class PlayerSubtitleSelectionRuntimeTest {
         assertEquals(-400, reopenedEpisodeTwo.loadStartingSubtitleDelayMs())
     }
 
-    private fun advanceToEpisodeTwo(runtime: PlayerScreenRuntime, bingeGroup: String?): RecordingController {
+    private fun advanceToEpisodeTwo(
+        runtime: PlayerScreenRuntime,
+        bingeGroup: String?,
+        embeddedSubtitleTracks: List<SubtitleTrack> = emptyList(),
+    ): RecordingController {
         runtime.switchToEpisodeStream(
             StreamItem(
                 url = "https://example.com/episode-2.mp4",
@@ -167,11 +171,138 @@ class PlayerSubtitleSelectionRuntimeTest {
         runtime.resetIdentityStateIfNeeded()
         runtime.addonSubtitles = listOf(englishEpisodeTwo)
         runtime.playbackSnapshot = PlayerPlaybackSnapshot(isLoading = false)
-        return RecordingController().also {
+        return RecordingController(embeddedSubtitleTracks).also {
             runtime.playerController = it
             runtime.playerControllerSourceUrl = runtime.activeSourceUrl
         }
     }
+
+    @Test
+    fun rememberedEmbeddedTrackIsPickedOnTheNextEpisodeWithoutAPreferredLanguage() {
+        val runtime = runtime(bingeGroup = GROUP_A, preferredSubtitleLanguage = SubtitleLanguageOption.NONE)
+        runtime.playerController = RecordingController(embeddedTracks())
+        runtime.refreshTracks()
+        runtime.handlePlayerControlsEvent("selectBuiltInSubtitleTrack", 1.0)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A, embeddedSubtitleTracks = embeddedTracks())
+        runtime.refreshTracks()
+
+        assertEquals(listOf(1), controller.subtitleSelections)
+        assertEquals(1, runtime.selectedSubtitleIndex)
+        assertTrue(runtime.isUserExplicitSubtitleSelection)
+    }
+
+    @Test
+    fun rememberedOffBeatsThePreferredLanguage() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.handlePlayerControlsEvent("selectBuiltInSubtitleTrack", -1.0)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A, embeddedSubtitleTracks = embeddedTracks())
+        runtime.refreshTracks()
+
+        assertTrue(controller.subtitleUrls.isEmpty())
+        assertEquals(listOf(-1), controller.subtitleSelections)
+        assertEquals(-1, runtime.selectedSubtitleIndex)
+    }
+
+    @Test
+    fun choiceAndDelaySurviveARestartAndEachReleaseKeepsItsOwn() {
+        val episodeOne = runtime(bingeGroup = GROUP_A)
+        val frenchIndex = episodeOne.visibleAddonSubtitles.indexOfFirst { it.url == frenchEpisodeOne.url }
+        episodeOne.handlePlayerControlsEvent("selectAddonSubtitle", frenchIndex.toDouble())
+        episodeOne.handlePlayerControlsEvent("subtitleDelayDelta", 1_000.0)
+
+        // Another release of the same episode has no record: auto-selection.
+        val otherRelease = runtime(bingeGroup = GROUP_B)
+        val otherReleaseController = otherRelease.playerController as RecordingController
+        otherRelease.refreshTracks()
+        assertEquals(listOf(englishEpisodeOne.url), otherReleaseController.subtitleUrls)
+
+        // Back on the first release, the same episode reopens the exact subtitle.
+        val reopened = runtime(bingeGroup = GROUP_A)
+        val reopenedController = reopened.playerController as RecordingController
+        reopened.refreshTracks()
+        assertEquals(listOf(frenchEpisodeOne.url), reopenedController.subtitleUrls)
+
+        // A fresh player on the next episode (Continue Watching after a restart).
+        val episodeTwo = runtime(bingeGroup = GROUP_A, episode = 2)
+        episodeTwo.addonSubtitles = listOf(englishEpisodeTwo, otherFrenchEpisodeTwo, frenchEpisodeTwo)
+        val episodeTwoController = episodeTwo.playerController as RecordingController
+        episodeTwo.refreshTracks()
+        assertEquals(listOf(frenchEpisodeTwo.url), episodeTwoController.subtitleUrls)
+        assertEquals(1_000, episodeTwo.loadStartingSubtitleDelayMs())
+    }
+
+    @Test
+    fun automaticPicksNeverOverwriteTheRememberedChoice() {
+        val episodeOne = runtime(bingeGroup = GROUP_A)
+        episodeOne.persistAddonSubtitlePreference(frenchEpisodeOne)
+
+        val episodeTwo = runtime(bingeGroup = GROUP_A, episode = 2)
+        episodeTwo.addonSubtitles = listOf(englishEpisodeTwo)
+        episodeTwo.refreshTracks()
+        assertEquals(englishEpisodeTwo.url, episodeTwo.selectedAddonSubtitle?.url)
+
+        val remembered = PlayerTrackPreferenceStorage.loadReleaseSubtitleChoice("tt2026", GROUP_A)
+        assertEquals(PersistedSubtitleSelectionType.ADDON, remembered?.subtitleType)
+        assertEquals("fr", remembered?.language)
+    }
+
+    @Test
+    fun delayOnAnAutomaticPickRemembersThatSubtitle() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.refreshTracks()
+        runtime.setSubtitleDelay(750)
+
+        val remembered = PlayerTrackPreferenceStorage.loadReleaseSubtitleChoice("tt2026", GROUP_A)
+        assertEquals(PersistedSubtitleSelectionType.ADDON, remembered?.subtitleType)
+        assertEquals("en", remembered?.language)
+        assertEquals(750, remembered?.delayMs)
+    }
+
+    @Test
+    fun embeddedFullSubtitleBeatsAHashMatchedAddonSubtitle() {
+        val runtime = runtime(bingeGroup = null)
+        runtime.addonSubtitles = listOf(englishEpisodeOne.copy(isVideoHashMatch = true))
+        val controller = RecordingController(
+            listOf(
+                SubtitleTrack(index = 0, id = "3", label = "English Signs (ass)", language = "eng"),
+                SubtitleTrack(index = 1, id = "4", label = "en (subrip)", language = "eng"),
+            ),
+        )
+        runtime.playerController = controller
+
+        runtime.refreshTracks()
+
+        assertEquals(listOf(1), controller.subtitleSelections)
+        assertTrue(controller.subtitleUrls.isEmpty())
+    }
+
+    @Test
+    fun lateHashMatchReplacesOnlyAnAutomaticPick() {
+        val hashMatch = englishEpisodeTwo.copy(url = "https://subs.example/episode-2-en-hash.srt", isVideoHashMatch = true)
+
+        val automatic = runtime(bingeGroup = GROUP_A, episode = 2)
+        val automaticController = automatic.playerController as RecordingController
+        automatic.refreshTracks()
+        automatic.addonSubtitles = listOf(englishEpisodeTwo, hashMatch)
+        automatic.tryReplaceAutoSelectedSubtitleWithVideoHashMatch()
+        assertEquals(listOf(englishEpisodeTwo.url, hashMatch.url), automaticController.subtitleUrls)
+
+        runtime(bingeGroup = GROUP_A).persistAddonSubtitlePreference(englishEpisodeOne)
+        val remembered = runtime(bingeGroup = GROUP_A, episode = 2)
+        val rememberedController = remembered.playerController as RecordingController
+        remembered.refreshTracks()
+        remembered.addonSubtitles = listOf(englishEpisodeTwo, hashMatch)
+        remembered.tryReplaceAutoSelectedSubtitleWithVideoHashMatch()
+        assertEquals(listOf(englishEpisodeTwo.url), rememberedController.subtitleUrls)
+    }
+
+    private fun embeddedTracks() = listOf(
+        SubtitleTrack(index = 0, id = "3", label = "Signs", language = "eng"),
+        SubtitleTrack(index = 1, id = "4", label = "en (subrip)", language = "eng"),
+        SubtitleTrack(index = 2, id = "5", label = "ja (subrip)", language = "jpn"),
+    )
 
     @Test
     fun playerDefaultTrackTurnedOffWithoutPreferredLanguageIsNotShownAsSelected() {
@@ -200,17 +331,21 @@ class PlayerSubtitleSelectionRuntimeTest {
         )
     }
 
-    private fun runtime(bingeGroup: String?) = PlayerScreenRuntime(
+    private fun runtime(
+        bingeGroup: String?,
+        episode: Int = 1,
+        preferredSubtitleLanguage: String = "en",
+    ) = PlayerScreenRuntime(
         PlayerScreenArgs(
             profileId = 1,
             title = "Series",
-            sourceUrl = "https://example.com/episode-1.mp4",
+            sourceUrl = "https://example.com/episode-$episode.mp4",
             sourceAudioUrl = null,
             sourceHeaders = emptyMap(),
             sourceResponseHeaders = emptyMap(),
             streamType = null,
             providerName = "Test",
-            streamTitle = "Episode 1",
+            streamTitle = "Episode $episode",
             streamSubtitle = null,
             initialBingeGroup = bingeGroup,
             pauseDescription = null,
@@ -222,11 +357,11 @@ class PlayerSubtitleSelectionRuntimeTest {
             poster = null,
             background = null,
             seasonNumber = 1,
-            episodeNumber = 1,
-            episodeTitle = "Episode 1",
+            episodeNumber = episode,
+            episodeTitle = "Episode $episode",
             episodeThumbnail = null,
             contentType = "series",
-            videoId = "tt2026:1:1",
+            videoId = "tt2026:1:$episode",
             parentMetaId = "tt2026",
             parentMetaType = "series",
             providerAddonId = "test",
@@ -239,8 +374,8 @@ class PlayerSubtitleSelectionRuntimeTest {
         ),
     ).apply {
         scope = this@PlayerSubtitleSelectionRuntimeTest.scope
-        playerSettingsUiState = PlayerSettingsUiState(preferredSubtitleLanguage = "en")
-        addonSubtitles = listOf(englishEpisodeOne, frenchEpisodeOne)
+        playerSettingsUiState = PlayerSettingsUiState(preferredSubtitleLanguage = preferredSubtitleLanguage)
+        addonSubtitles = if (episode == 1) listOf(englishEpisodeOne, frenchEpisodeOne) else listOf(englishEpisodeTwo)
         playbackSnapshot = PlayerPlaybackSnapshot(isLoading = false)
         playerController = RecordingController()
         resetIdentityStateIfNeeded()
@@ -280,7 +415,7 @@ class PlayerSubtitleSelectionRuntimeTest {
         override fun applyAudioLanguagePreferences(languages: List<String>) = Unit
         override fun selectAudioTrack(index: Int) = Unit
         override fun clearExternalSubtitle() = Unit
-        override fun clearExternalSubtitleAndSelect(trackIndex: Int) = Unit
+        override fun clearExternalSubtitleAndSelect(trackIndex: Int) = selectSubtitleTrack(trackIndex)
     }
 
     companion object {

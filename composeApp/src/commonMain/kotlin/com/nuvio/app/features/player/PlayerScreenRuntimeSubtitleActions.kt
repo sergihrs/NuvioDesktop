@@ -83,22 +83,14 @@ internal fun PlayerScreenRuntime.setSubtitleDelay(delayMs: Int) {
     val clamped = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
     subtitleDelayMs = clamped
     PlayerTrackPreferenceStorage.saveSubtitleDelayMs(playbackSession.videoId, clamped)
-    val bingeGroup = currentStreamBingeGroup?.trim()?.takeIf { it.isNotBlank() }
-    if (parentMetaId.isNotBlank() && bingeGroup != null) {
-        PlayerTrackPreferenceStorage.saveSeriesSubtitleDelay(
-            contentId = parentMetaId,
-            delay = PersistedSeriesSubtitleDelay(delayMs = clamped, bingeGroup = bingeGroup),
-        )
-    }
+    rememberReleaseSubtitleDelay(clamped)
     playerController?.setSubtitleDelayMs(clamped)
 }
 
 internal fun PlayerScreenRuntime.loadStartingSubtitleDelayMs(): Int =
     resolveStartingSubtitleDelayMs(
         episodeDelayMs = PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId),
-        seriesDelay = parentMetaId.takeIf { it.isNotBlank() && playerSettingsUiState.keepSubtitlesAcrossEpisodes }
-            ?.let(PlayerTrackPreferenceStorage::loadSeriesSubtitleDelay),
-        currentBingeGroup = currentStreamBingeGroup,
+        rememberedDelayMs = rememberedReleaseSubtitleChoice()?.delayMs,
     )
 
 internal fun PlayerScreenRuntime.loadSubtitleAutoSyncCues(force: Boolean = false) {
