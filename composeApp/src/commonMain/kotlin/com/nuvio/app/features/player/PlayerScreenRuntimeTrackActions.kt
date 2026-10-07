@@ -374,6 +374,8 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
 
     if (!hasScannedTextTracksOnce) return
     if (playbackSnapshot.isLoading) return
+    // Bounded wait for the hash-matched list (see PlayerScreenRuntimeVideoHash.kt).
+    if (holdAddonSubtitleAutoPickForVideoHash) return
 
     val addonMatch = selectionPlan.targets.firstNotNullOfOrNull { target ->
         addonSubtitles.preferringVideoHashMatches().firstOrNull { subtitle ->
