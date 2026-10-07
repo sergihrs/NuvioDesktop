@@ -173,6 +173,33 @@ class PlayerSubtitleSelectionRuntimeTest {
         }
     }
 
+    @Test
+    fun playerDefaultTrackTurnedOffWithoutPreferredLanguageIsNotShownAsSelected() {
+        val runtime = runtime(bingeGroup = null)
+        runtime.playerSettingsUiState = PlayerSettingsUiState(preferredSubtitleLanguage = SubtitleLanguageOption.NONE)
+        // The player auto-selects the default-flagged embedded track when the file opens.
+        val controller = RecordingController(
+            embeddedSubtitleTracks = listOf(
+                SubtitleTrack(index = 0, id = "3", label = "en (subrip)", language = "eng", isSelected = true),
+                SubtitleTrack(index = 1, id = "4", label = "ja (subrip)", language = "jpn"),
+            ),
+        )
+        runtime.playerController = controller
+
+        runtime.refreshTracks()
+
+        assertEquals(listOf(-1), controller.subtitleSelections)
+        assertTrue(runtime.subtitleTracks.none { it.isSelected })
+        assertEquals(
+            null,
+            selectedSubtitleOptionId(runtime.subtitleTracks, runtime.selectedSubtitleIndex, runtime.selectedAddonSubtitle),
+        )
+        assertEquals(
+            SubtitleOffLanguageKey,
+            selectedSubtitleLanguageKey(runtime.subtitleTracks, runtime.selectedSubtitleIndex, runtime.selectedAddonSubtitle),
+        )
+    }
+
     private fun runtime(bingeGroup: String?) = PlayerScreenRuntime(
         PlayerScreenArgs(
             profileId = 1,
@@ -227,7 +254,9 @@ class PlayerSubtitleSelectionRuntimeTest {
         addonName = addonName,
     )
 
-    private class RecordingController : PlayerEngineController {
+    private class RecordingController(
+        private var embeddedSubtitleTracks: List<SubtitleTrack> = emptyList(),
+    ) : PlayerEngineController {
         val subtitleUrls = mutableListOf<String>()
         val subtitleSelections = mutableListOf<Int>()
 
@@ -237,10 +266,11 @@ class PlayerSubtitleSelectionRuntimeTest {
 
         override fun selectSubtitleTrack(index: Int) {
             subtitleSelections += index
+            embeddedSubtitleTracks = embeddedSubtitleTracks.map { it.copy(isSelected = it.index == index) }
         }
 
         override fun getAudioTracks() = emptyList<AudioTrack>()
-        override fun getSubtitleTracks() = emptyList<SubtitleTrack>()
+        override fun getSubtitleTracks() = embeddedSubtitleTracks
         override fun play() = Unit
         override fun pause() = Unit
         override fun seekTo(positionMs: Long) = Unit
