@@ -76,6 +76,7 @@ data class PlayerSettingsUiState(
     val streamAutoPlayNextEpisodeFallbackEnabled: Boolean = true,
     val streamAutoPlayPreferBingeGroup: Boolean = true,
     val streamAutoPlayReuseBingeGroup: Boolean = false,
+    val keepSubtitlesAcrossEpisodes: Boolean = true,
     val nextEpisodeThresholdMode: NextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE,
     val nextEpisodeThresholdPercent: Float = 99f,
     val nextEpisodeThresholdMinutesBeforeEnd: Float = 2f,
@@ -148,6 +149,7 @@ object PlayerSettingsRepository {
     private var streamAutoPlayNextEpisodeFallbackEnabled = true
     private var streamAutoPlayPreferBingeGroup = true
     private var streamAutoPlayReuseBingeGroup = false
+    private var keepSubtitlesAcrossEpisodes = true
     private var nextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE
     private var nextEpisodeThresholdPercent = 99f
     private var nextEpisodeThresholdMinutesBeforeEnd = 2f
@@ -225,6 +227,7 @@ object PlayerSettingsRepository {
         streamAutoPlayNextEpisodeFallbackEnabled = true
         streamAutoPlayPreferBingeGroup = true
         streamAutoPlayReuseBingeGroup = false
+        keepSubtitlesAcrossEpisodes = true
         nextEpisodeThresholdMode = NextEpisodeThresholdMode.PERCENTAGE
         nextEpisodeThresholdPercent = 99f
         nextEpisodeThresholdMinutesBeforeEnd = 2f
@@ -365,6 +368,7 @@ object PlayerSettingsRepository {
         streamAutoPlayNextEpisodeFallbackEnabled = PlayerSettingsStorage.loadStreamAutoPlayNextEpisodeFallbackEnabled() ?: true
         streamAutoPlayPreferBingeGroup = PlayerSettingsStorage.loadStreamAutoPlayPreferBingeGroup() ?: true
         streamAutoPlayReuseBingeGroup = PlayerSettingsStorage.loadStreamAutoPlayReuseBingeGroup() ?: false
+        keepSubtitlesAcrossEpisodes = PlayerSettingsStorage.loadKeepSubtitlesAcrossEpisodes() ?: true
         nextEpisodeThresholdMode = PlayerSettingsStorage.loadNextEpisodeThresholdMode()
             ?.let { runCatching { NextEpisodeThresholdMode.valueOf(it) }.getOrNull() }
             ?: NextEpisodeThresholdMode.PERCENTAGE
@@ -780,6 +784,14 @@ object PlayerSettingsRepository {
         PlayerSettingsStorage.saveStreamAutoPlayReuseBingeGroup(enabled)
     }
 
+    fun setKeepSubtitlesAcrossEpisodes(enabled: Boolean) {
+        ensureLoaded()
+        if (keepSubtitlesAcrossEpisodes == enabled) return
+        keepSubtitlesAcrossEpisodes = enabled
+        publish()
+        PlayerSettingsStorage.saveKeepSubtitlesAcrossEpisodes(enabled)
+    }
+
     fun setNextEpisodeThresholdMode(mode: NextEpisodeThresholdMode) {
         ensureLoaded()
         if (nextEpisodeThresholdMode == mode) return
@@ -1046,6 +1058,7 @@ object PlayerSettingsRepository {
             streamAutoPlayNextEpisodeFallbackEnabled = streamAutoPlayNextEpisodeFallbackEnabled,
             streamAutoPlayPreferBingeGroup = streamAutoPlayPreferBingeGroup,
             streamAutoPlayReuseBingeGroup = streamAutoPlayReuseBingeGroup,
+            keepSubtitlesAcrossEpisodes = keepSubtitlesAcrossEpisodes,
             nextEpisodeThresholdMode = nextEpisodeThresholdMode,
             nextEpisodeThresholdPercent = nextEpisodeThresholdPercent,
             nextEpisodeThresholdMinutesBeforeEnd = nextEpisodeThresholdMinutesBeforeEnd,

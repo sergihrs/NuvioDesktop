@@ -1235,6 +1235,8 @@
     <string name="settings_playback_subtitle_outline_description">Draw a border around subtitle text.</string>
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
+    <string name="settings_playback_keep_subtitles_across_episodes">Keep Subtitles Across Episodes</string>
+    <string name="settings_playback_keep_subtitles_across_episodes_description">When the next episode plays from the same release (binge group), reuse the subtitle addon, language and delay you chose.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
     <string name="settings_playback_subtitle_strip_sdh">Strip SDH Subtitles</string>
     <string name="settings_playback_subtitle_strip_sdh_description">Hide sound descriptions and speaker labels from text subtitles.</string>

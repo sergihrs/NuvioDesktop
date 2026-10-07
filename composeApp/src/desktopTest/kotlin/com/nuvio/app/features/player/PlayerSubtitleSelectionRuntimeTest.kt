@@ -114,6 +114,21 @@ class PlayerSubtitleSelectionRuntimeTest {
     }
 
     @Test
+    fun disabledSettingKeepsThePreferredLanguageAndZeroDelay() {
+        val runtime = runtime(bingeGroup = GROUP_A)
+        runtime.persistAddonSubtitlePreference(frenchEpisodeOne)
+        runtime.setSubtitleDelay(1_500)
+
+        val controller = advanceToEpisodeTwo(runtime, bingeGroup = GROUP_A)
+        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(keepSubtitlesAcrossEpisodes = false)
+        runtime.addonSubtitles = listOf(englishEpisodeTwo, frenchEpisodeTwo)
+        runtime.refreshTracks()
+
+        assertEquals(listOf(englishEpisodeTwo.url), controller.subtitleUrls)
+        assertEquals(0, runtime.loadStartingSubtitleDelayMs())
+    }
+
+    @Test
     fun subtitleDelayCarriesOnlyWithinTheSameBingeGroup() {
         val runtime = runtime(bingeGroup = GROUP_A)
         runtime.setSubtitleDelay(1_500)

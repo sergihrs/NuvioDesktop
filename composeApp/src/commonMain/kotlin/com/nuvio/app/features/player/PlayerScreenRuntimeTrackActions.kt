@@ -137,11 +137,13 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                     preference = preference,
                     itemId = subtitlePreferenceItemId,
                 )
-                val carriesIntoCurrentItem = !belongsToCurrentItem && shouldCarryAddonSubtitleIntoItem(
-                    preference = preference,
-                    itemId = subtitlePreferenceItemId,
-                    currentBingeGroup = currentStreamBingeGroup,
-                )
+                val carriesIntoCurrentItem = !belongsToCurrentItem &&
+                    playerSettingsUiState.keepSubtitlesAcrossEpisodes &&
+                    shouldCarryAddonSubtitleIntoItem(
+                        preference = preference,
+                        itemId = subtitlePreferenceItemId,
+                        currentBingeGroup = currentStreamBingeGroup,
+                    )
                 if (belongsToCurrentItem && persistedUrl != null) {
                     selectedAddonSubtitleId = preference.addonSubtitleId ?: persistedUrl
                     selectedSubtitleIndex = -1

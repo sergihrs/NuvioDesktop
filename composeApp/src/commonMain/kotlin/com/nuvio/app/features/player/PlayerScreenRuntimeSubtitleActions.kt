@@ -32,7 +32,7 @@ internal fun PlayerScreenRuntime.setSubtitleDelay(delayMs: Int) {
 internal fun PlayerScreenRuntime.loadStartingSubtitleDelayMs(): Int =
     resolveStartingSubtitleDelayMs(
         episodeDelayMs = PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId),
-        seriesDelay = parentMetaId.takeIf { it.isNotBlank() }
+        seriesDelay = parentMetaId.takeIf { it.isNotBlank() && playerSettingsUiState.keepSubtitlesAcrossEpisodes }
             ?.let(PlayerTrackPreferenceStorage::loadSeriesSubtitleDelay),
         currentBingeGroup = currentStreamBingeGroup,
     )
