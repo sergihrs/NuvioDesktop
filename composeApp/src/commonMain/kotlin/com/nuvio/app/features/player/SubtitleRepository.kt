@@ -1,6 +1,7 @@
 package com.nuvio.app.features.player
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +35,12 @@ object SubtitleRepository {
     var lastRequestedVideoParams: SubtitleVideoParams? = null
         private set
 
+    /**
+     * Subtitle lists by request (addons + video, including the hash extras) for this session, and
+     * prefetches started before an episode is played, so switching to it shows its list at once.
+     */
+    private val listCache = AddonSubtitleListCache(scope)
+
     fun fetchAddonSubtitles(
         type: String,
         videoId: String,
@@ -42,13 +49,29 @@ object SubtitleRepository {
         activeFetchJob?.cancel()
         _loadingProgress.value = null
         lastRequestedVideoParams = videoParams
+        val requests = addonSubtitleRequests(type, videoId, videoParams)
+        val cacheKey = addonSubtitleListCacheKey(requests)
+        listCache.cached(cacheKey)?.let { subtitles ->
+            activeFetchJob = null
+            _error.value = null
+            _addonSubtitles.value = subtitles
+            _isLoading.value = false
+            return
+        }
+        val prefetch = listCache.inFlight(cacheKey)
         activeFetchJob = scope.launch {
             _isLoading.value = true
             _error.value = null
             _addonSubtitles.value = emptyList()
 
-            val requests = addonSubtitleRequests(type, videoId, videoParams)
             if (requests.isEmpty()) {
+                _isLoading.value = false
+                return@launch
+            }
+
+            val prefetched = prefetch?.awaitOrEmpty().orEmpty()
+            if (prefetched.isNotEmpty()) {
+                _addonSubtitles.value = prefetched
                 _isLoading.value = false
                 return@launch
             }
@@ -63,6 +86,8 @@ object SubtitleRepository {
 
             if (_addonSubtitles.value.isEmpty()) {
                 _error.value = getString(Res.string.compose_player_no_subtitles_found)
+            } else {
+                listCache.store(cacheKey, _addonSubtitles.value)
             }
             _isLoading.value = false
         }
@@ -72,27 +97,64 @@ object SubtitleRepository {
      * Refetches with better [videoParams] (typically once the video hash is known) without
      * clearing the current list: the new results replace it in one step, and a failed refetch
      * keeps the old list. Falls back to a normal fetch while a fetch is still running.
+     * Returns the refetch job, or null when the list was replaced from the cache at once.
      */
     fun refreshAddonSubtitles(
         type: String,
         videoId: String,
         videoParams: SubtitleVideoParams,
-    ) {
+    ): Job? {
         if (_isLoading.value || _addonSubtitles.value.isEmpty()) {
             fetchAddonSubtitles(type, videoId, videoParams)
-            return
+            return activeFetchJob
         }
         activeFetchJob?.cancel()
         lastRequestedVideoParams = videoParams
+        val requests = addonSubtitleRequests(type, videoId, videoParams)
+        if (requests.isEmpty()) {
+            activeFetchJob = null
+            return null
+        }
+        val cacheKey = addonSubtitleListCacheKey(requests)
+        listCache.cached(cacheKey)?.let { subtitles ->
+            activeFetchJob = null
+            _error.value = null
+            _addonSubtitles.value = subtitles
+            return null
+        }
+        val prefetch = listCache.inFlight(cacheKey)
         activeFetchJob = scope.launch {
-            val requests = addonSubtitleRequests(type, videoId, videoParams)
-            if (requests.isEmpty()) return@launch
-            val subtitles = loadAddonSubtitles(requests)
+            val subtitles = prefetch?.awaitOrEmpty()?.takeIf { it.isNotEmpty() }
+                ?: loadAddonSubtitles(requests)
             if (subtitles.isNotEmpty()) {
+                listCache.store(cacheKey, subtitles)
                 _error.value = null
                 _addonSubtitles.value = subtitles
             }
         }
+        return activeFetchJob
+    }
+
+    /**
+     * Loads the subtitle list for an upcoming video in the background (e.g. the next episode
+     * while the current one ends) so [fetchAddonSubtitles] with the same request finds it ready.
+     * Does not touch the list that is currently shown.
+     */
+    fun prefetchAddonSubtitles(
+        type: String,
+        videoId: String,
+        videoParams: SubtitleVideoParams?,
+    ): Deferred<List<AddonSubtitle>>? {
+        val requests = addonSubtitleRequests(type, videoId, videoParams)
+        if (requests.isEmpty()) return null
+        return listCache.prefetch(addonSubtitleListCacheKey(requests)) {
+            loadAddonSubtitles(requests)
+        }
+    }
+
+    /** Forgets cached and prefetched subtitle lists (account wipe). */
+    fun clearCachedLists() {
+        listCache.clear()
     }
 
     fun clear() {

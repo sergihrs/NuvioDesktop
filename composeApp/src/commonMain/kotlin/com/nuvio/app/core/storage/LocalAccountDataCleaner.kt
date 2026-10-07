@@ -82,6 +82,7 @@ internal object LocalAccountDataCleaner {
         MetaDetailsRepository.clear()
         SearchRepository.reset()
         SubtitleRepository.clear()
+        SubtitleRepository.clearCachedLists()
         PlayerLaunchStore.clear()
         StreamLaunchStore.clear()
         StreamContextStore.clear()
