@@ -981,20 +981,7 @@ internal class NativePlayerController(
         }
 
     override fun getSubtitleTracks(): List<SubtitleTrack> =
-        decodeTracks { NativePlayerBridge.subtitleTracksJson(it) }.map { track ->
-            SubtitleTrack(
-                index = track.index,
-                id = track.id,
-                label = track.label,
-                language = track.language.takeUnless(String::isBlank),
-                isSelected = track.selected,
-                isForced = track.forced || inferForcedSubtitleTrack(
-                    label = track.label,
-                    language = track.language,
-                    trackId = track.id,
-                ),
-            )
-        }
+        decodeTracks { NativePlayerBridge.subtitleTracksJson(it) }.toBuiltInSubtitleTracks()
 
     override fun applyAudioLanguagePreferences(languages: List<String>) {
         val trackIndex = findPreferredAudioTrackIndex(getAudioTracks(), languages)
@@ -1127,14 +1114,38 @@ private fun String.shouldLogNativeControlEvent(): Boolean {
 }
 
 @Serializable
-private data class NativeMpvTrack(
+internal data class NativeMpvTrack(
     val index: Int = 0,
     val id: String = "",
     val label: String = "",
     val language: String = "",
     val selected: Boolean = false,
     val forced: Boolean = false,
+    /** Added with sub-add (addon or sidecar subtitles), not part of the file. */
+    val external: Boolean = false,
 )
+
+/**
+ * The file's own subtitle tracks. Subtitles loaded with sub-add show up in mpv's track list as
+ * external tracks; they are the selected addon subtitle, not built-in ones, and would otherwise
+ * appear as an extra "Built-in" entry (and could be auto-selected as one). mpv appends them after
+ * the file's tracks, so leaving them out keeps the indices of the file's tracks unchanged.
+ */
+internal fun List<NativeMpvTrack>.toBuiltInSubtitleTracks(): List<SubtitleTrack> =
+    filterNot { it.external }.map { track ->
+        SubtitleTrack(
+            index = track.index,
+            id = track.id,
+            label = track.label,
+            language = track.language.takeUnless(String::isBlank),
+            isSelected = track.selected,
+            isForced = track.forced || inferForcedSubtitleTrack(
+                label = track.label,
+                language = track.language,
+                trackId = track.id,
+            ),
+        )
+    }
 
 private fun resolveTrackId(index: Int, tracks: List<NativeMpvTrack>): Int? =
     tracks.firstNotNullOfOrNull { track ->

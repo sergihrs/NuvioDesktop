@@ -2629,6 +2629,7 @@ static void nuvioMpvWakeup(void *ctx) {
         long long channelCount = [self int64Property:[[prefix stringByAppendingString:@"/demux-channel-count"] UTF8String] fallback:0];
         BOOL selected = [self flagProperty:[[prefix stringByAppendingString:@"/selected"] UTF8String] fallback:NO];
         BOOL forced = [self flagProperty:[[prefix stringByAppendingString:@"/forced"] UTF8String] fallback:NO];
+        BOOL external = [self flagProperty:[[prefix stringByAppendingString:@"/external"] UTF8String] fallback:NO];
         NSString *label = [self formatTrackTitleWithType:type
                                                    index:logicalIndex
                                                    title:title
@@ -2644,6 +2645,7 @@ static void nuvioMpvWakeup(void *ctx) {
             @"language": language ?: @"",
             @"selected": @(selected),
             @"forced": @(forced),
+            @"external": @(external),
         }];
         logicalIndex += 1;
     }
