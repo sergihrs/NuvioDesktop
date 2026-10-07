@@ -46,11 +46,9 @@ actual object AppUpdaterPlatform {
         if (currentOs == DesktopUpdaterOs.LINUX) detectLinuxInstallMethod() else LinuxInstallMethod.UNKNOWN
     }
 
-    // A Flatpak cannot install anything for itself: the sandbox has no write
-    // access to /app and the manifest grants no talk-name for the host Flatpak
-    // service, so the update belongs to the user's store, not to this dialog.
     actual val isSupported: Boolean
-        get() = currentOs != DesktopUpdaterOs.UNKNOWN && linuxInstallMethod != LinuxInstallMethod.FLATPAK
+        get() = currentOs != DesktopUpdaterOs.UNKNOWN &&
+            (currentOs != DesktopUpdaterOs.LINUX || linuxCanInstallUpdates(linuxInstallMethod))
 
     actual val releaseSource: AppUpdateReleaseSource = AppUpdateReleaseSource(
         owner = "NuvioMedia",
@@ -259,15 +257,29 @@ private const val javaExecutableName = "java"
 private const val packageQueryTimeoutSeconds = 3L
 private const val appImageExitWaitTicks = 100
 
+// A Flatpak cannot install anything for itself: the sandbox has no write
+// access to /app and the manifest grants no talk-name for the host Flatpak
+// service, so the update belongs to the user's store, not to this dialog.
+// An install that resolves to none of the known formats (a distribution
+// package such as the AUR ones, an extracted AppImage, a source build) is in
+// the same place: no asset in a release can update it, and handing one to
+// xdg-open only opens it in whatever app claims the file before Nuvio quits.
+internal fun linuxCanInstallUpdates(method: LinuxInstallMethod): Boolean = when (method) {
+    LinuxInstallMethod.APP_IMAGE,
+    LinuxInstallMethod.RPM,
+    LinuxInstallMethod.DEB -> true
+    LinuxInstallMethod.FLATPAK,
+    LinuxInstallMethod.UNKNOWN -> false
+}
+
 // A release carries every Linux format at once, so the extension list has to be
-// the one the running install can actually consume. An unresolved install keeps
-// the previous list, leaving source and tarball builds no worse off than before.
+// the one the running install can actually consume.
 internal fun linuxUpdateFileExtensions(method: LinuxInstallMethod): List<String> = when (method) {
     LinuxInstallMethod.APP_IMAGE -> listOf(".AppImage")
     LinuxInstallMethod.RPM -> listOf(".rpm")
     LinuxInstallMethod.DEB -> listOf(".deb")
-    LinuxInstallMethod.FLATPAK -> emptyList()
-    LinuxInstallMethod.UNKNOWN -> listOf(".deb", ".AppImage")
+    LinuxInstallMethod.FLATPAK,
+    LinuxInstallMethod.UNKNOWN -> emptyList()
 }
 
 internal fun resolveLinuxInstallMethod(

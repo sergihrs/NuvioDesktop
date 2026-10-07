@@ -163,11 +163,22 @@ class LinuxUpdateInstallTest {
     }
 
     @Test
-    fun `an unresolved install keeps the previous asset list`() {
-        assertEquals(
-            listOf(".deb", ".AppImage"),
-            linuxUpdateFileExtensions(LinuxInstallMethod.UNKNOWN),
-        )
+    fun `an unresolved install is offered no asset`() {
+        assertNull(selectFor(LinuxInstallMethod.UNKNOWN))
+    }
+
+    @Test
+    fun `a flatpak is offered no asset`() {
+        assertNull(selectFor(LinuxInstallMethod.FLATPAK))
+    }
+
+    @Test
+    fun `only installs the updater can replace offer the in-app update`() {
+        assertTrue(linuxCanInstallUpdates(LinuxInstallMethod.APP_IMAGE))
+        assertTrue(linuxCanInstallUpdates(LinuxInstallMethod.RPM))
+        assertTrue(linuxCanInstallUpdates(LinuxInstallMethod.DEB))
+        assertFalse(linuxCanInstallUpdates(LinuxInstallMethod.FLATPAK))
+        assertFalse(linuxCanInstallUpdates(LinuxInstallMethod.UNKNOWN))
     }
 
     @Test
