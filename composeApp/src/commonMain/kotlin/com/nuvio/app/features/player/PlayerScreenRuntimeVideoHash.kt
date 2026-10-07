@@ -1,10 +1,13 @@
 package com.nuvio.app.features.player
 
 import androidx.compose.runtime.snapshotFlow
+import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
@@ -164,4 +167,69 @@ internal suspend fun PlayerScreenRuntime.holdAddonSubtitleAutoPickWhileVideoHash
     } finally {
         holdAddonSubtitleAutoPickForVideoHash = false
     }
+}
+
+/**
+ * Prepares subtitles for the next episode once its stream has been chosen (the autoplay
+ * countdown), so they are ready the moment it starts:
+ * - HTTP sources (debrid): hashes the file with two range reads now;
+ * - torrents: uses a remembered hash only. nuvio-engine streams one file at a time: preparing
+ *   another file pauses the other torrents and, for a season pack, deprioritises the episode
+ *   that is still playing, so the next torrent is not touched before the switch;
+ * then prefetches the addon subtitle list with the same extras the player will ask for, which
+ * SubtitleRepository hands over without a new request after the switch.
+ */
+internal fun PlayerScreenRuntime.prepareNextEpisodeSubtitles(stream: StreamItem, episode: MetaVideo) {
+    val type = activeAddonSubtitleType.takeIf { it.isNotBlank() } ?: return
+    val videoId = episode.id.takeIf { it.isNotBlank() } ?: return
+    val hints = stream.behaviorHints.toSubtitleVideoParams()
+    val torrentInfoHash = stream.p2pInfoHash?.takeIf { isP2pStream(stream) }
+    val url = stream.playableDirectUrl?.takeIf { torrentInfoHash == null }
+    val identity = subtitleVideoHashIdentity(
+        torrentInfoHash = torrentInfoHash,
+        torrentFileIdx = stream.p2pFileIdx,
+        torrentFilename = stream.behaviorHints.filename,
+        sourceUrl = url,
+    )
+    val headers = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
+    nextEpisodeSubtitlePrepJob?.cancel()
+    nextEpisodeSubtitlePrepJob = scope.launch {
+        val params = nextEpisodeSubtitleVideoParams(
+            hints = hints,
+            identity = identity,
+            url = url,
+            headers = headers,
+        )
+        SubtitleRepository.prefetchAddonSubtitles(type, videoId, params)
+    }
+}
+
+/**
+ * The subtitle extras the player will send once the next episode plays, computed ahead of time:
+ * hashing an HTTP source now stores the hash under the same identity the player looks up after
+ * the switch, so its first subtitle request matches the prefetched one.
+ */
+internal suspend fun nextEpisodeSubtitleVideoParams(
+    hints: SubtitleVideoParams,
+    identity: String?,
+    url: String?,
+    headers: Map<String, String>,
+    computeHash: suspend (url: String, headers: Map<String, String>, identity: String?, expectedFileSize: Long?) ->
+        OpenSubtitlesVideoHash? = { hashUrl, hashHeaders, hashIdentity, size ->
+            SubtitleVideoHashRepository.computeHash(hashUrl, hashHeaders, hashIdentity, size)
+        },
+    canHash: (String?) -> Boolean = SubtitleVideoHashRepository::canHash,
+    verifiedHash: (String?) -> OpenSubtitlesVideoHash? = SubtitleVideoHashRepository::verifiedHash,
+    cachedHash: (String?) -> OpenSubtitlesVideoHash? = SubtitleVideoHashRepository::cachedHash,
+): SubtitleVideoParams? {
+    val computed = when {
+        hints.videoHash != null -> null
+        verifiedHash(identity) != null -> null
+        url != null && canHash(url) -> computeHash(url, headers, identity, hints.videoSize)
+        else -> null
+    }
+    return resolveSubtitleVideoParams(
+        streamHints = hints,
+        computedHash = computed ?: rememberedSubtitleVideoHash(identity, hints.videoSize, cachedHash, verifiedHash),
+    )
 }

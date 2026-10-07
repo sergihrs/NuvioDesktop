@@ -44,6 +44,69 @@ class SubtitleVideoHashTimingTest {
         assertTrue(134_464L..199_999L in requested)
     }
 
+    @Test
+    fun `next episode params match what the player asks for after the switch`() = runTest {
+        val identity = "url:https://cdn.example/next.mkv"
+        val stored = HashMap<String, OpenSubtitlesVideoHash>()
+        val hints = SubtitleVideoParams(videoSize = 200_000L, filename = "Show.S01E02.mkv")
+        var hashCalls = 0
+
+        val prepared = nextEpisodeSubtitleVideoParams(
+            hints = hints,
+            identity = identity,
+            url = "https://cdn.example/next.mkv",
+            headers = emptyMap(),
+            computeHash = { _, _, id, size ->
+                hashCalls += 1
+                assertEquals(200_000L, size)
+                expected.also { stored[id!!] = it }
+            },
+            canHash = { true },
+            verifiedHash = { stored[it] },
+            cachedHash = { stored[it] },
+        )
+        // After the switch the player resolves its params from the stored hash.
+        val afterSwitch = resolveSubtitleVideoParams(
+            streamHints = hints,
+            computedHash = rememberedSubtitleVideoHash(identity, hints.videoSize, { stored[it] }, { stored[it] }),
+        )
+
+        assertEquals(1, hashCalls)
+        assertEquals(
+            SubtitleVideoParams(videoHash = expected.hash, videoSize = 200_000L, filename = "Show.S01E02.mkv"),
+            prepared,
+        )
+        assertEquals(prepared, afterSwitch)
+    }
+
+    @Test
+    fun `next torrent episode is never read and uses only a remembered hash`() = runTest {
+        val hints = SubtitleVideoParams(filename = "Show.S01E02.mkv")
+        val withoutHash = nextEpisodeSubtitleVideoParams(
+            hints = hints,
+            identity = "bt:aa:2",
+            url = null,
+            headers = emptyMap(),
+            computeHash = { _, _, _, _ -> error("torrents must not be read before the switch") },
+            canHash = { true },
+            verifiedHash = { null },
+            cachedHash = { null },
+        )
+        val remembered = nextEpisodeSubtitleVideoParams(
+            hints = hints,
+            identity = "bt:aa:2",
+            url = null,
+            headers = emptyMap(),
+            computeHash = { _, _, _, _ -> error("torrents must not be read before the switch") },
+            canHash = { true },
+            verifiedHash = { expected },
+            cachedHash = { expected },
+        )
+
+        assertEquals(hints, withoutHash)
+        assertEquals(expected.hash, remembered?.videoHash)
+    }
+
     private fun range(start: Long, end: Long) = VideoByteRange(
         bytes = file.copyOfRange(start.toInt(), end.toInt() + 1),
         totalBytes = file.size.toLong(),

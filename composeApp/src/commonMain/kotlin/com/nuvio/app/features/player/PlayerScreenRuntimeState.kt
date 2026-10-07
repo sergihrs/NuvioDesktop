@@ -157,6 +157,7 @@ internal class PlayerScreenRuntime(
      * see holdAddonSubtitleAutoPickWhileVideoHashPending). Built-in tracks and restored choices never wait.
      */
     var holdAddonSubtitleAutoPickForVideoHash by mutableStateOf(false)
+    var nextEpisodeSubtitlePrepJob: Job? = null
     var activeSourceIdentityKey by mutableStateOf(
         torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
             "torrent:$hash:${torrentFileIdx ?: -1}"

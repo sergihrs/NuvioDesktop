@@ -435,6 +435,9 @@ internal fun PlayerScreenRuntime.playNextEpisode(automatic: Boolean = false) {
         onNextEpisodeCardVisibleChanged = {
             if (playbackKey == activePlaybackKey) showNextEpisodeCard = it
         },
+        onEpisodeStreamChosen = { stream, episode ->
+            if (isCurrentRequest()) prepareNextEpisodeSubtitles(stream, episode)
+        },
     )?.let { job ->
         nextEpisodeAutoPlayJob = job
     }
