@@ -1366,6 +1366,8 @@ private fun PlayerControlsState.toControlsJson(isFullscreen: Boolean): String =
         append(',')
         appendJsonField("fetchSubtitlesLabel", fetchSubtitlesLabel)
         append(',')
+        appendJsonField("subtitleExactMatchLabel", subtitleExactMatchLabel)
+        append(',')
         appendJsonField("subtitleDelayLabel", subtitleDelayLabel)
         append(',')
         appendJsonField("resetLabel", resetLabel)
@@ -1794,6 +1796,8 @@ private fun StringBuilder.appendSubtitleOptionItemJson(item: PlayerControlSubtit
     appendJsonField("metadata", item.metadata)
     append(',')
     appendJsonField("isSelected", item.isSelected)
+    append(',')
+    appendJsonField("isVideoHashMatch", item.isVideoHashMatch)
     append('}')
 }
 

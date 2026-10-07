@@ -431,6 +431,7 @@
     <string name="compose_player_auto_sync">Auto Sync</string>
     <string name="compose_player_bold">Bold</string>
     <string name="compose_player_built_in">Built-in</string>
+    <string name="compose_player_subtitle_exact_match">Exact match</string>
     <string name="compose_player_bottom_offset">Bottom Offset</string>
     <string name="compose_player_capture_line">Capture</string>
     <string name="compose_player_close">Close player</string>
