@@ -150,6 +150,14 @@ internal class PlayerScreenRuntime(
     var activeTorrentTrackers by mutableStateOf(torrentTrackers)
     var p2pResolvedSourceUrl by mutableStateOf<String?>(null)
     var activeSubtitleVideoParams by mutableStateOf(subtitleVideoParams)
+    /** True while the active source's hash, and the subtitle refetch with it, are in flight. */
+    var subtitleVideoHashPending by mutableStateOf(false)
+    /**
+     * True while an automatic addon subtitle pick should wait for the hash-matched list (bounded,
+     * see holdAddonSubtitleAutoPickWhileVideoHashPending). Built-in tracks and restored choices never wait.
+     */
+    var holdAddonSubtitleAutoPickForVideoHash by mutableStateOf(false)
+    var nextEpisodeSubtitlePrepJob: Job? = null
     var activeSourceIdentityKey by mutableStateOf(
         torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
             "torrent:$hash:${torrentFileIdx ?: -1}"

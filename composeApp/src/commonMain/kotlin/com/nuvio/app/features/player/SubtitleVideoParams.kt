@@ -1,18 +1,9 @@
 package com.nuvio.app.features.player
 
 import com.nuvio.app.features.addons.encodeAddonPathSegment
-import com.nuvio.app.features.addons.httpRequestRaw
 import com.nuvio.app.features.streams.StreamBehaviorHints
-import com.nuvio.app.isIos
-import kotlinx.atomicfu.locks.SynchronizedObject
-import kotlinx.atomicfu.locks.synchronized
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.coroutineScope
 
 /**
  * Describes the playing video file for subtitle addons, mirroring Stremio's `VideoParams`.
@@ -113,121 +104,40 @@ internal data class OpenSubtitlesVideoHash(
 )
 
 /**
- * Computes the OpenSubtitles hash with two range reads; the file size comes from the first
- * response's Content-Range. [fetchRange] returns the requested bytes (inclusive range) or null
- * when the source cannot serve byte ranges.
+ * Computes the OpenSubtitles hash with two range reads. [fetchRange] returns the requested bytes
+ * (inclusive range) or null when the source cannot serve byte ranges.
+ *
+ * With an [expectedFileSize] (e.g. the stream's `videoSize` hint) the head and tail are read
+ * concurrently; the size is then confirmed by both responses' Content-Range, and a wrong hint
+ * falls back to reading the tail again at the real end. Without it the tail is read once the
+ * head response has reported the file size.
  */
 internal suspend fun computeOpenSubtitlesVideoHash(
+    expectedFileSize: Long? = null,
     fetchRange: suspend (start: Long, endInclusive: Long) -> VideoByteRange?,
-): OpenSubtitlesVideoHash? {
+): OpenSubtitlesVideoHash? = coroutineScope {
     val chunk = OpenSubtitlesHashChunkSize.toLong()
-    val head = fetchRange(0L, chunk - 1) ?: return null
-    val fileSize = head.totalBytes ?: return null
-    if (fileSize < chunk * 2) return null
-    if (head.bytes.size != OpenSubtitlesHashChunkSize) return null
-    val tail = fetchRange(fileSize - chunk, fileSize - 1) ?: return null
-    if (tail.bytes.size != OpenSubtitlesHashChunkSize || tail.totalBytes != fileSize) return null
-    return OpenSubtitlesVideoHash(
+    val guessedSize = expectedFileSize?.takeIf { it >= chunk * 2 }
+    val guessedTail = guessedSize?.let { size -> async { fetchRange(size - chunk, size - 1) } }
+    val head = fetchRange(0L, chunk - 1)
+    val fileSize = head?.totalBytes
+    if (head == null || fileSize == null || fileSize < chunk * 2 ||
+        head.bytes.size != OpenSubtitlesHashChunkSize
+    ) {
+        guessedTail?.cancel()
+        return@coroutineScope null
+    }
+    val tail = if (guessedTail != null && guessedSize == fileSize) {
+        guessedTail.await()
+    } else {
+        guessedTail?.cancel()
+        fetchRange(fileSize - chunk, fileSize - 1)
+    }
+    if (tail == null || tail.bytes.size != OpenSubtitlesHashChunkSize || tail.totalBytes != fileSize) {
+        return@coroutineScope null
+    }
+    OpenSubtitlesVideoHash(
         hash = computeOpenSubtitlesHash(fileSize, head.bytes, tail.bytes),
         fileSize = fileSize,
     )
-}
-
-/**
- * Computes and caches the OpenSubtitles hash of playing HTTP sources (debrid links, the local
- * torrent stream server). Each source is hashed once in the background; callers only wait
- * as long as they choose to.
- */
-internal object SubtitleVideoHashRepository {
-    private const val HASH_TIMEOUT_MS = 30_000L
-    private const val MAX_CACHED_SOURCES = 16
-
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
-    private val lock = SynchronizedObject()
-    private val inFlight = LinkedHashMap<String, Deferred<OpenSubtitlesVideoHash?>>()
-    private val completed = LinkedHashMap<String, OpenSubtitlesVideoHash>()
-
-    /**
-     * Range reads need a client that stops after the requested bytes; the iOS HTTP client
-     * buffers whole responses, so a server that ignores Range would download the whole file.
-     */
-    val isSupported: Boolean
-        get() = !isIos
-
-    fun canHash(url: String?): Boolean =
-        isSupported && url != null &&
-            (url.startsWith("http://", ignoreCase = true) || url.startsWith("https://", ignoreCase = true))
-
-    fun hashAsync(
-        url: String,
-        headers: Map<String, String>,
-    ): Deferred<OpenSubtitlesVideoHash?>? {
-        if (!canHash(url)) return null
-        return synchronized(lock) {
-            inFlight[url]?.let { return@synchronized it }
-            val deferred = scope.async {
-                val result = withTimeoutOrNull(HASH_TIMEOUT_MS) {
-                    computeOpenSubtitlesVideoHash { start, endInclusive ->
-                        fetchHttpRange(url, headers, start, endInclusive)
-                    }
-                }
-                synchronized(lock) {
-                    if (result != null) {
-                        completed[url] = result
-                        completed.trimToSize()
-                    } else {
-                        // Allow a later playback of the same URL to try again.
-                        inFlight.remove(url)
-                    }
-                }
-                result
-            }
-            inFlight[url] = deferred
-            inFlight.trimToSize()
-            deferred
-        }
-    }
-
-    fun cachedHash(url: String?): OpenSubtitlesVideoHash? {
-        if (url == null) return null
-        return synchronized(lock) { completed[url] }
-    }
-
-    private fun <V> LinkedHashMap<String, V>.trimToSize() {
-        while (size > MAX_CACHED_SOURCES) {
-            remove(keys.first())
-        }
-    }
-
-    private suspend fun fetchHttpRange(
-        url: String,
-        headers: Map<String, String>,
-        start: Long,
-        endInclusive: Long,
-    ): VideoByteRange? {
-        val expectedLength = (endInclusive - start + 1).toInt()
-        val response = try {
-            httpRequestRaw(
-                method = "GET",
-                url = url,
-                headers = headers.filterKeys { !it.equals("Range", ignoreCase = true) } +
-                    ("Range" to "bytes=$start-$endInclusive"),
-                body = "",
-                maxResponseBodyBytes = expectedLength,
-            )
-        } catch (error: Exception) {
-            if (error is CancellationException) throw error
-            return null
-        }
-        // A 200 means the server ignored Range; the tail cannot be read cheaply then.
-        if (response.status != 206) return null
-        val contentRange = response.headers.entries
-            .firstOrNull { (name, _) -> name.equals("Content-Range", ignoreCase = true) }
-            ?.value
-        if (contentRange?.trim()?.startsWith("bytes $start-") != true) return null
-        return VideoByteRange(
-            bytes = response.bodyBytes,
-            totalBytes = parseContentRangeTotalBytes(contentRange),
-        )
-    }
 }

@@ -280,6 +280,10 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         computeSubtitleVideoHashAndRefresh(url)
     }
 
+    LaunchedEffect(subtitleVideoHashPending) {
+        holdAddonSubtitleAutoPickWhileVideoHashPending(subtitleVideoHashPending)
+    }
+
     LaunchedEffect(addonSubtitles, selectedAddonSubtitleId) {
         tryReplaceAutoSelectedSubtitleWithVideoHashMatch()
     }
@@ -304,6 +308,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
         trackPreferenceRestoreApplied,
         addonSubtitles,
         isLoadingAddonSubtitles,
+        holdAddonSubtitleAutoPickForVideoHash,
     ) {
         if (playerController == null || playbackSnapshot.isLoading) {
             return@LaunchedEffect

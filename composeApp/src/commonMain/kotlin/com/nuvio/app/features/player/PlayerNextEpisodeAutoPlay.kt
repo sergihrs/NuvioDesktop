@@ -80,6 +80,8 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
     onSourceNameChanged: (String?) -> Unit,
     onCountdownChanged: (Int?) -> Unit,
     onNextEpisodeCardVisibleChanged: (Boolean) -> Unit,
+    /** Called as soon as the next episode's playable stream is known, before the countdown. */
+    onEpisodeStreamChosen: (StreamItem, MetaVideo) -> Unit = { _, _ -> },
 ): Job? {
     val nextVideoId = nextEpisodeInfo?.videoId ?: return null
     val nextVideo = allEpisodes.firstOrNull { video -> video.id == nextVideoId } ?: return null
@@ -277,6 +279,7 @@ internal fun CoroutineScope.launchPlayerNextEpisodeAutoPlay(
         }
         onSearchingChanged(false)
         if (selected != null) {
+            onEpisodeStreamChosen(selected, nextVideo)
             onSourceNameChanged((selected.name?.takeIf { it.isNotBlank() } ?: selected.addonName).trim())
             for (i in 3 downTo 1) {
                 onCountdownChanged(i)

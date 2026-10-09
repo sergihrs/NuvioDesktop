@@ -21,6 +21,7 @@ import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.p2p.P2pSettingsRepository
 import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.player.SubtitleRepository
+import com.nuvio.app.features.player.SubtitleVideoHashRepository
 import com.nuvio.app.features.profiles.ProfileRepository
 import com.nuvio.app.features.profiles.MAX_PROFILES
 import com.nuvio.app.features.search.SearchRepository
@@ -82,6 +83,8 @@ internal object LocalAccountDataCleaner {
         MetaDetailsRepository.clear()
         SearchRepository.reset()
         SubtitleRepository.clear()
+        SubtitleRepository.clearCachedLists()
+        SubtitleVideoHashRepository.clearLocalState()
         PlayerLaunchStore.clear()
         StreamLaunchStore.clear()
         StreamContextStore.clear()

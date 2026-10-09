@@ -356,7 +356,9 @@ internal fun PlayerScreenRuntime.refreshTracks() {
  * track refresh and whenever the addon subtitle list changes. Embedded full subtitles, hash matches
  * and remembered choices never go through here.
  */
-internal fun PlayerScreenRuntime.isFallbackAddonSubtitlePickAllowed(): Boolean = true
+internal fun PlayerScreenRuntime.isFallbackAddonSubtitlePickAllowed(): Boolean =
+    // Bounded wait for the hash-matched list (see holdAddonSubtitleAutoPickWhileVideoHashPending).
+    !holdAddonSubtitleAutoPickForVideoHash
 
 private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTracks(
     preferredAudioTargets: List<String>,
