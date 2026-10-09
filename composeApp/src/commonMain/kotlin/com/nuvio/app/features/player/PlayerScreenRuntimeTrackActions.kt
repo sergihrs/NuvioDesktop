@@ -104,6 +104,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
     when (preference.subtitleType) {
         PersistedSubtitleSelectionType.DISABLED -> {
             playerController?.selectSubtitleTrack(-1)
+            syncSubtitleTrackSelection(-1)
             selectedSubtitleIndex = -1
             selectedAddonSubtitleId = null
             useCustomSubtitles = false
@@ -119,6 +120,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                     } else {
                         playerController?.selectSubtitleTrack(restoredSubtitleIndex)
                     }
+                    syncSubtitleTrackSelection(restoredSubtitleIndex)
                     selectedSubtitleIndex = restoredSubtitleIndex
                     selectedAddonSubtitleId = null
                     useCustomSubtitles = false
@@ -140,6 +142,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                     selectedSubtitleIndex = -1
                     useCustomSubtitles = true
                     playerController?.setSubtitleUri(persistedUrl)
+                    syncSubtitleTrackSelection(-1)
                     preferredSubtitleSelectionApplied = true
                     isUserExplicitSubtitleSelection = true
                 } else if (belongsToCurrentItem) {
@@ -160,6 +163,7 @@ internal fun PlayerScreenRuntime.restorePersistedTrackPreferenceIfNeeded(): Bool
                         selectedSubtitleIndex = -1
                         useCustomSubtitles = true
                         playerController?.setSubtitleUri(subtitle.url)
+                        syncSubtitleTrackSelection(-1)
                         preferredSubtitleSelectionApplied = true
                         isUserExplicitSubtitleSelection = true
                     } else {
@@ -294,6 +298,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
                 selectedSubtitleIndex = -1
                 useCustomSubtitles = true
                 playerController?.setSubtitleUri(primaryAddonMatch.url)
+                syncSubtitleTrackSelection(-1)
                 return
             }
         }
@@ -304,6 +309,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             } else {
                 playerController?.selectSubtitleTrack(internalIndex)
             }
+            syncSubtitleTrackSelection(internalIndex)
             selectedSubtitleIndex = internalIndex
             selectedAddonSubtitleId = null
             useCustomSubtitles = false
@@ -336,6 +342,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
             selectedSubtitleIndex = -1
             useCustomSubtitles = true
             playerController?.setSubtitleUri(forcedAddonMatch.url)
+            syncSubtitleTrackSelection(-1)
         } else {
             disableAutomaticSubtitleSelection()
         }
@@ -374,6 +381,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
         selectedSubtitleIndex = -1
         useCustomSubtitles = true
         playerController?.setSubtitleUri(addonMatch.url)
+        syncSubtitleTrackSelection(-1)
     } else if (!preferredSubtitleSelectionApplied) {
         disableAutomaticSubtitleSelection()
         preferredSubtitleSelectionApplied = true
@@ -387,4 +395,20 @@ private fun PlayerScreenRuntime.disableAutomaticSubtitleSelection() {
     selectedSubtitleIndex = -1
     selectedAddonSubtitleId = null
     useCustomSubtitles = false
+    syncSubtitleTrackSelection(-1)
+}
+
+/**
+ * Mirrors a subtitle selection the runtime just sent to the player in [subtitleTracks].
+ *
+ * The track list is only re-read from the player in [refreshTracks], and the subtitle menus fall
+ * back to the track the player reports as selected when no index is chosen. Without this, turning
+ * off a track the player had auto-selected (for example a default-flagged embedded track while the
+ * preferred subtitle language is None) left that track marked as selected in the menu although
+ * nothing was shown. [selectedIndex] is -1 for "off" and for addon subtitles, which are separate
+ * external tracks in the player.
+ */
+internal fun PlayerScreenRuntime.syncSubtitleTrackSelection(selectedIndex: Int) {
+    if (subtitleTracks.all { it.isSelected == (it.index == selectedIndex) }) return
+    subtitleTracks = subtitleTracks.map { it.copy(isSelected = it.index == selectedIndex) }
 }
