@@ -38,6 +38,7 @@ import com.nuvio.app.features.watchprogress.buildPlaybackVideoId
 import com.nuvio.app.features.watching.application.WatchingState
 import com.nuvio.app.isDesktop
 import com.nuvio.app.features.player.skip.internalSkipAction
+import com.nuvio.app.features.player.skip.shouldShowSkipPrompt
 import com.nuvio.app.features.servers.ServerStreams
 import com.nuvio.app.features.streams.streamAddonInstanceId
 import com.nuvio.app.isIos
@@ -429,7 +430,12 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
             )
         } else null,
         openingProgress = p2pInitialLoadingProgress,
-        skipPromptVisible = nativeSkipInterval != null && !playerControlsLocked,
+        skipPromptVisible = shouldShowSkipPrompt(
+            hasSkipSegment = nativeSkipInterval != null,
+            controlsLocked = playerControlsLocked,
+            nextEpisodeCardVisible = nextEpisodeForControls != null,
+            nextEpisodePlayable = nextEpisodeForControls?.hasAired == true,
+        ),
         skipPromptLabel = if (nativeSkipAction?.skipsToPostCredits == true) {
             stringResource(Res.string.player_skip_to_post_credits)
         } else {

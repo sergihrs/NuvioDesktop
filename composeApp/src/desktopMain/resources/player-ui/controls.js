@@ -2266,6 +2266,14 @@ const renderNativePlaybackPrompts = () => {
 const isPlaybackPromptShown = element =>
   element.classList.contains("visible") && element.getClientRects().length > 0;
 
+// The one prompt Enter acts on: the skip button, or else a playable next-episode card. The app hides the skip
+// button while a playable next episode is offered, so at the end of an episode there is only one of them.
+const playbackPromptEnterCommand = () => {
+  if (isPlaybackPromptShown(skipPrompt)) return "skipInterval";
+  if (isPlaybackPromptShown(nextEpisodeCard) && state.nextEpisodePlayable) return "playNextEpisode";
+  return "";
+};
+
 const isOpeningOverlayActive = () =>
   Boolean((!hasReceivedPlayerControls || state.showOpeningOverlay) && state.isLoading);
 
@@ -3807,11 +3815,12 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (event.code === "Enter" && isPlaybackPromptShown(skipPrompt)) {
+  const promptCommand = event.code === "Enter" ? playbackPromptEnterCommand() : "";
+  if (promptCommand) {
     const activeEl = document.activeElement;
     if (!activeEl || activeEl.tagName === "BODY" || activeEl === root) {
       event.preventDefault();
-      send("skipInterval", 0);
+      send(promptCommand, 0);
       return;
     }
   }
