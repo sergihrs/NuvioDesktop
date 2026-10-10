@@ -412,6 +412,11 @@ let chromeInteractionLastNotedAt = 0;
 let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
+// A mouse click leaves the clicked control focused (WebKitGTK focuses buttons on press). That focus is not the
+// user navigating with the keyboard, so it must not take Enter from the skip / next-episode prompt.
+// pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
+let lastInputWasPointer = false;
+let pointerFocusedElement = null;
 let hiddenCursorTimer = 0;
 let hiddenCursorTemporarilyVisible = false;
 let cursorActivityLastSentAt = 0;
@@ -2189,15 +2194,19 @@ const playbackPromptEnterCommand = () => {
   return "";
 };
 
-// Enter reaches the prompt only while no control has keyboard focus (focus sits on the player itself).
 const isShortcutRootFocused = () => {
   const activeEl = document.activeElement;
   return !activeEl || activeEl.tagName === "BODY" || activeEl === root;
 };
 
+// A control has keyboard focus: focus is on a control and got there by keyboard (Tab, arrows), not by a click.
+// Only then does Enter belong to that control; otherwise it belongs to the prompt.
+const hasKeyboardControlFocus = () =>
+  !isShortcutRootFocused() && document.activeElement !== pointerFocusedElement;
+
 // Mark the prompt Enter will trigger, with the player's focus ring, so the default action is visible.
 const syncPlaybackPromptDefault = () => {
-  const command = !activeModal && isShortcutRootFocused() ? playbackPromptEnterCommand() : "";
+  const command = !activeModal && !hasKeyboardControlFocus() ? playbackPromptEnterCommand() : "";
   skipPrompt.classList.toggle("is-default", command === "skipInterval");
   nextEpisodeCard.classList.toggle("is-default", command === "playNextEpisode");
 };
@@ -2775,6 +2784,10 @@ const clearPressedButton = () => {
 };
 
 document.addEventListener("pointerdown", event => {
+  lastInputWasPointer = true;
+  // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
+  pointerFocusedElement = document.activeElement;
+  syncPlaybackPromptDefault();
   if (event.button === 3) {
     showCommandToast("seekBack");
     send("seekBack", 0);
@@ -2819,6 +2832,12 @@ document.addEventListener("pointerleave", () => {
   updateChromePointerInside(false);
 }, true);
 document.addEventListener("focusin", event => {
+  if (lastInputWasPointer) {
+    pointerFocusedElement = event.target;
+  } else if (event.target !== pointerFocusedElement || event.relatedTarget) {
+    // Moved by keyboard. The same element regaining focus with the window (no relatedTarget) keeps its origin.
+    pointerFocusedElement = null;
+  }
   isChromeFocusInside = isChromeInteractionTarget(event.target);
   const actionButton = event.target.closest && event.target.closest(".action-pill .action");
   if (actionButton) {
@@ -3676,6 +3695,11 @@ document.addEventListener("keyup", event => {
   }
 });
 
+// Any key other than a lone modifier switches to keyboard input: focus it moves from now on is keyboard focus.
+document.addEventListener("keydown", event => {
+  if (!["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) lastInputWasPointer = false;
+}, true);
+
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && activeModal) {
     clearSpaceHoldTimerAndStopSpeedBoost();
@@ -3863,8 +3887,14 @@ document.addEventListener("keydown", event => {
     return;
   }
 
+  // Enter on a control focused by a click acts as if the player had focus: the click does not make the control
+  // the Enter target (it would e.g. restart an ended episode instead of playing the next one).
+  if (event.code === "Enter" && !isShortcutRootFocused() && !hasKeyboardControlFocus()) {
+    event.preventDefault();
+    focusShortcutRoot();
+  }
   const promptCommand = event.code === "Enter" ? playbackPromptEnterCommand() : "";
-  if (promptCommand && isShortcutRootFocused()) {
+  if (promptCommand && !hasKeyboardControlFocus()) {
     event.preventDefault();
     send(promptCommand, 0);
     return;
