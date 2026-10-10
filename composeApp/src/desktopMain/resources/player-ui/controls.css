@@ -191,6 +191,18 @@ button:disabled {
   pointer-events: none;
 }
 
+/* The rail panels' card sits over the title block at the bottom left, and a click on the bar below only
+   closes the panel, so the bar is dimmed further to not look active. */
+.player.rail-panel-open .metadata {
+  opacity: 0;
+}
+
+.player.rail-panel-open .action-row,
+.player.rail-panel-open .scrub,
+.player.rail-panel-open .time-row {
+  opacity: .5;
+}
+
 .player.chrome-hidden .top-gradient,
 .player.chrome-hidden .bottom-gradient,
 .player.chrome-hidden .metadata,
@@ -820,6 +832,7 @@ button:disabled {
 }
 
 .header-button,
+.panel-close-button,
 .opening-button,
 .side-control,
 .play-control,
@@ -858,6 +871,8 @@ button:disabled {
 
 .header-button:active,
 .header-button.is-pressed,
+.panel-close-button:active,
+.panel-close-button.is-pressed,
 .skip-prompt:active,
 .skip-prompt.is-pressed,
 .next-episode-card.playable:active,
@@ -1968,10 +1983,9 @@ button:disabled {
   align-items: flex-end;
   justify-content: flex-start;
   padding: clamp(28px, 4vw, 52px) clamp(28px, 4vw, 52px) max(clamp(64px, 11vh, 124px), var(--rail-bottom-clearance));
-  background:
-    linear-gradient(90deg, rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .66) 36%, transparent 82%),
-    linear-gradient(180deg, rgba(0, 0, 0, .6) 0%, rgba(0, 0, 0, .34) 30%, rgba(0, 0, 0, .14) 60%, transparent 100%),
-    rgba(0, 0, 0, .34);
+  /* One even dim, like the Sources/Episodes scrim: the picture stays visible around the card, and the dimmed
+     area reads as "outside", where a click closes the panel. */
+  background: rgba(0, 0, 0, .34);
 }
 
 .player-rail-modal .track-panel {
@@ -1979,10 +1993,14 @@ button:disabled {
   max-width: calc(100vw - clamp(56px, 8vw, 104px));
   /* Fit inside the layer's padding; a vh guess let tall rails push the title up against the top edge. */
   max-height: 100%;
-  overflow: visible;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  /* A card sized to its content, so the panel's edge (and the picture outside it) is visible. Flat on purpose:
+     no blur or large shadow, the page is composited over the video on every frame. */
+  padding: 18px 20px 12px;
+  overflow: hidden;
+  border: 1px solid var(--theme-border-default);
+  border-radius: 20px;
+  background: var(--theme-surface-elevated);
+  background: color-mix(in srgb, var(--theme-surface-elevated) 92%, transparent);
   box-shadow: none;
   transform: translateY(14px);
 }
@@ -2038,12 +2056,48 @@ button:disabled {
   font-weight: 700;
 }
 
+.rail-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+}
+
 .player-rail-modal .track-header {
-  padding: 0 0 12px;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff;
-  font-size: 28px;
-  line-height: 34px;
+  font-size: 24px;
+  line-height: 32px;
   font-weight: 500;
+}
+
+/* The rail panels' own close button: Esc and a click outside the panel close it too, but nothing showed that. */
+.panel-close-button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--theme-border-default);
+  border-radius: 999px;
+  background: var(--theme-surface-card);
+  color: var(--theme-text-secondary);
+}
+
+.panel-close-button:hover {
+  background: var(--theme-selected-surface);
+  color: var(--theme-text-primary);
+}
+
+.panel-close-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .track-header-row {
@@ -3135,29 +3189,26 @@ button.action:focus-visible {
     padding-left: clamp(28px, 4vw, 52px);
   }
 
-  .player-rail-modal .track-header {
-    padding-bottom: 20px;
-    font-size: 34px;
-    line-height: 42px;
+  .rail-header {
+    padding-bottom: 14px;
+  }
+
+  .player-rail-modal .track-panel {
+    padding: 22px 24px 14px;
   }
 
   .audio-rail-panel {
-    width: min(560px, calc(100vw - clamp(112px, 12vw, 224px))) !important;
+    width: min(520px, calc(100vw - clamp(112px, 12vw, 224px))) !important;
   }
 
-  .subtitle-rail-panel {
-    width: min(1280px, calc(100vw - clamp(112px, 12vw, 224px))) !important;
-  }
-
+  /* Columns sized to their content with laptop-friendly caps, so the card leaves part of the picture visible. */
   .subtitle-rails {
-    width: min(860px, 100%);
-    grid-template-columns: minmax(250px, .8fr) minmax(400px, 1.2fr);
-    gap: 28px;
+    grid-template-columns: clamp(220px, 15vw, 280px) clamp(320px, 22vw, 420px);
+    gap: 24px;
   }
 
   .subtitle-rails.style-visible {
-    width: 100%;
-    grid-template-columns: minmax(250px, .78fr) minmax(400px, 1.25fr) minmax(340px, 1fr);
+    grid-template-columns: clamp(220px, 15vw, 280px) clamp(320px, 22vw, 420px) clamp(300px, 19vw, 360px);
   }
 
   .subtitle-rail {
@@ -3407,10 +3458,12 @@ button.action:focus-visible {
     padding-bottom: var(--rail-bottom-clearance);
   }
 
-  .player-rail-modal .track-header {
+  .rail-header {
     padding-bottom: 8px;
-    font-size: 24px;
-    line-height: 30px;
+  }
+
+  .player-rail-modal .track-panel {
+    padding-top: 14px;
   }
 
   .player-rail-modal .track-list,
@@ -3448,6 +3501,7 @@ button.action:focus-visible {
   .modal-layer,
   .track-panel,
   .header-button,
+  .panel-close-button,
   .opening-button,
   .side-control,
   .play-control,
