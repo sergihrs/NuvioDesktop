@@ -1387,6 +1387,15 @@ button:disabled {
   animation: opening-artwork-drift 14000ms ease-in-out infinite alternate;
 }
 
+/* The opening overlay stays in the page (at opacity 0) for the whole playback.
+   Its endless artwork drift and logo pulse kept running there, so the engine
+   repainted the full-screen artwork every frame for nothing. Freeze them while
+   the overlay is hidden (paused, not removed: no jump during the fade-out). */
+.opening-overlay:not(.visible) *,
+.opening-overlay:not(.visible)::before {
+  animation-play-state: paused !important;
+}
+
 .opening-scrim {
   position: absolute;
   inset: 0;
