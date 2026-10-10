@@ -2232,6 +2232,7 @@ const renderNativePlaybackPrompts = () => {
   skipPrompt.setAttribute("aria-hidden", showSkip ? "false" : "true");
   skipPrompt.classList.toggle("visible", showSkip);
   skipPrompt.classList.toggle("show-progress", showSkipProgress);
+  skipPrompt.tabIndex = showSkip ? 0 : -1;
   syncSkipPromptPlacement(showSkip);
   if (showSkipProgress) {
     startSkipPromptAutoHide();
@@ -2251,10 +2252,15 @@ const renderNativePlaybackPrompts = () => {
   nextEpisodeAction.textContent = state.nextEpisodeActionLabel || "Play";
   nextEpisodeCard.setAttribute("aria-hidden", showNextEpisode ? "false" : "true");
   nextEpisodeCard.classList.toggle("visible", showNextEpisode);
+  nextEpisodeCard.tabIndex = showNextEpisode ? 0 : -1;
   nextEpisodeCard.classList.toggle("playable", Boolean(state.nextEpisodePlayable));
   nextEpisodeCard.classList.toggle("has-thumb", Boolean(nextThumbUrl));
   nextEpisodeCard.classList.toggle("blur-thumb", blurNextThumb);
 };
+
+// Shown on screen right now: not auto-hidden, and not removed by a mode such as PiP (display: none).
+const isPlaybackPromptShown = element =>
+  element.classList.contains("visible") && element.getClientRects().length > 0;
 
 const isOpeningOverlayActive = () =>
   Boolean((!hasReceivedPlayerControls || state.showOpeningOverlay) && state.isLoading);
@@ -2465,8 +2471,10 @@ const renderChrome = () => {
   if (showError) {
     skipPrompt.classList.remove("visible", "show-progress");
     skipPrompt.setAttribute("aria-hidden", "true");
+    skipPrompt.tabIndex = -1;
     nextEpisodeCard.classList.remove("visible");
     nextEpisodeCard.setAttribute("aria-hidden", "true");
+    nextEpisodeCard.tabIndex = -1;
   } else {
     renderNativePlaybackPrompts();
   }
@@ -3795,7 +3803,7 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (event.code === "Enter" && state.skipPromptVisible) {
+  if (event.code === "Enter" && isPlaybackPromptShown(skipPrompt)) {
     const activeEl = document.activeElement;
     if (!activeEl || activeEl.tagName === "BODY" || activeEl === root) {
       event.preventDefault();
