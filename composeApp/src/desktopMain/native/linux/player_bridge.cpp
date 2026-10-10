@@ -111,6 +111,15 @@ struct Player {
     // state JSON so the gate stays open while either is on screen.
     bool skipPromptShown = false;
     bool nextEpisodeShown = false;
+    // Debug-only frame pacing stats (NUVIO_BRIDGE_DEBUG): overlay pushes, time to
+    // capture a frame and time spent in overlay-add, logged every ~5s.
+    struct OverlayStats {
+        gint64 windowStartUs = 0;
+        int pushes = 0;
+        double captureMs = 0, captureMaxMs = 0, uploadMs = 0, uploadMaxMs = 0;
+        double damagePx = 0;  // device pixels repainted (backing-store path)
+    } stats;
+    gint64 snapRequestedUs = 0;
     // X input focus owner before the overlay grabbed it (teardown restores it;
     // 0 = nothing saved). The overlay holds real X focus while the player is
     // attached — WKWebView/WebView2 parity — so the page's own keydown
@@ -509,6 +518,28 @@ void onOverlayDestroyed(GtkWidget *, gpointer data) {
     player->overlayXid = 0;
 }
 
+// Debug-only: account one overlay push and log a summary every ~5s.
+void recordOverlayPush(Player *player, double captureMs, double uploadMs, double damagePx) {
+    if (!nuvioDebug()) return;
+    auto &st = player->stats;
+    gint64 now = g_get_monotonic_time();
+    if (st.windowStartUs == 0) st.windowStartUs = now;
+    st.pushes++;
+    st.captureMs += captureMs;
+    st.captureMaxMs = std::max(st.captureMaxMs, captureMs);
+    st.uploadMs += uploadMs;
+    st.uploadMaxMs = std::max(st.uploadMaxMs, uploadMs);
+    st.damagePx += damagePx;
+    double secs = (now - st.windowStartUs) / 1e6;
+    if (secs >= 5.0) {
+        NUVIO_LOG("overlay stats: %.1f pushes/s, capture avg %.2f ms max %.2f, overlay-add avg %.2f ms max %.2f, "
+                  "repainted %.2f Mpx/push",
+                  st.pushes / secs, st.captureMs / st.pushes, st.captureMaxMs, st.uploadMs / st.pushes,
+                  st.uploadMaxMs, st.damagePx / st.pushes / 1e6);
+        st = Player::OverlayStats{};
+    }
+}
+
 // Free the snapshot buffers (safe to call with none allocated). Only after
 // overlay-remove or teardown — mpv's overlay points into snapSurf's data.
 void releaseSnapshots(Player *player) {
@@ -574,6 +605,8 @@ void onOverlaySnapshot(GObject *src, GAsyncResult *res, gpointer data) {
         }
     }
     cairo_surface_flush(surf);
+    double captureMs = (g_get_monotonic_time() - player->snapRequestedUs) / 1000.0;
+    gint64 uploadStart = g_get_monotonic_time();
     char addr[32], sw[16], sh[16], sstride[16];
     snprintf(addr, sizeof addr, "&%zu",
              (size_t)(uintptr_t)cairo_image_surface_get_data(surf));
@@ -584,6 +617,8 @@ void onOverlaySnapshot(GObject *src, GAsyncResult *res, gpointer data) {
                          "bgra", sw, sh, sstride, nullptr};
     mpv_command(player->mpv, cmd);
     player->overlayPushed = true;
+    recordOverlayPush(player, captureMs, (g_get_monotonic_time() - uploadStart) / 1000.0,
+                      (double)cairo_image_surface_get_width(surf) * cairo_image_surface_get_height(surf));
     if (player->snapSurfPrev) cairo_surface_destroy(player->snapSurfPrev);
     player->snapSurfPrev = player->snapSurf;
     player->snapSurf = surf;
@@ -683,6 +718,7 @@ void compositeOverlay(Player *player) {
             player->snapInFlight = true;
             player->snapWaitTicks = 0;
             if (!player->snapCancel) player->snapCancel = g_cancellable_new();
+            player->snapRequestedUs = g_get_monotonic_time();
             webkit_web_view_get_snapshot(player->webview, WEBKIT_SNAPSHOT_REGION_VISIBLE,
                                          WEBKIT_SNAPSHOT_OPTIONS_TRANSPARENT_BACKGROUND,
                                          player->snapCancel, onOverlaySnapshot,
