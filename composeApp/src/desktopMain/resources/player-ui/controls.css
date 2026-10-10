@@ -820,6 +820,7 @@ button:disabled {
 }
 
 .header-button,
+.panel-close-button,
 .opening-button,
 .side-control,
 .play-control,
@@ -858,6 +859,8 @@ button:disabled {
 
 .header-button:active,
 .header-button.is-pressed,
+.panel-close-button:active,
+.panel-close-button.is-pressed,
 .skip-prompt:active,
 .skip-prompt.is-pressed,
 .next-episode-card.playable:active,
@@ -2029,12 +2032,48 @@ button:disabled {
   font-weight: 700;
 }
 
+.rail-header {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+}
+
 .player-rail-modal .track-header {
-  padding: 0 0 12px;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: #fff;
   font-size: 28px;
   line-height: 34px;
   font-weight: 500;
+}
+
+/* The rail panels' own close button: Esc and a click outside the panel close it too, but nothing showed that. */
+.panel-close-button {
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--theme-border-default);
+  border-radius: 999px;
+  background: var(--theme-surface-card);
+  color: var(--theme-text-secondary);
+}
+
+.panel-close-button:hover {
+  background: var(--theme-selected-surface);
+  color: var(--theme-text-primary);
+}
+
+.panel-close-button svg {
+  width: 20px;
+  height: 20px;
 }
 
 .track-header-row {
@@ -3108,8 +3147,11 @@ button.action:focus-visible {
     padding-left: clamp(28px, 4vw, 52px);
   }
 
-  .player-rail-modal .track-header {
+  .rail-header {
     padding-bottom: 20px;
+  }
+
+  .player-rail-modal .track-header {
     font-size: 34px;
     line-height: 42px;
   }
@@ -3380,8 +3422,11 @@ button.action:focus-visible {
     padding-bottom: var(--rail-bottom-clearance);
   }
 
-  .player-rail-modal .track-header {
+  .rail-header {
     padding-bottom: 8px;
+  }
+
+  .player-rail-modal .track-header {
     font-size: 24px;
     line-height: 30px;
   }
@@ -3421,6 +3466,7 @@ button.action:focus-visible {
   .modal-layer,
   .track-panel,
   .header-button,
+  .panel-close-button,
   .opening-button,
   .side-control,
   .play-control,
