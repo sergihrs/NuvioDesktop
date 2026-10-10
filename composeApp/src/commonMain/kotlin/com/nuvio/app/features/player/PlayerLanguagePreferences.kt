@@ -527,10 +527,9 @@ fun resolvePreferredAudioLanguageTargets(
                     normalize(secondaryPreferredAudioLanguage),
                 ).distinct()
             } else {
-                // Fallback to device languages when original language is unknown
-                (deviceLanguages.mapNotNull(::normalize)
-                    + listOfNotNull(normalize(secondaryPreferredAudioLanguage))
-                ).distinct()
+                // Original language unknown: keep the track the file marks as default (the
+                // player's own choice) rather than switching to a dub in the device language.
+                listOfNotNull(normalize(secondaryPreferredAudioLanguage)).distinct()
             }
         }
 
@@ -604,7 +603,8 @@ fun inferForcedSubtitleTrack(
  * Used as a fallback when [resolveContentLanguage] has no explicit language field.
  */
 fun countryToLanguageCode(country: String?): String? {
-    val normalized = country?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
+    // Addons may list several countries ("United States, Japan"); the first is the main one.
+    val normalized = country?.substringBefore(',')?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
     return COUNTRY_TO_LANGUAGE_MAP[normalized]
 }
 
@@ -627,6 +627,7 @@ private val COUNTRY_TO_LANGUAGE_MAP = mapOf(
     "no" to "no", "dk" to "da", "fi" to "fi", "th" to "th",
     "il" to "he", "cz" to "cs", "ro" to "ro", "hu" to "hu",
     "ua" to "uk", "gr" to "el",
+    "us" to "en", "gb" to "en", "uk" to "en", "ie" to "en", "au" to "en", "nz" to "en",
     // ISO 3166-1 alpha-3
     "jpn" to "ja", "kor" to "ko", "chn" to "zh", "twn" to "zh",
     "fra" to "fr", "deu" to "de", "ita" to "it", "esp" to "es",
@@ -635,6 +636,7 @@ private val COUNTRY_TO_LANGUAGE_MAP = mapOf(
     "nor" to "no", "dnk" to "da", "fin" to "fi", "tha" to "th",
     "isr" to "he", "cze" to "cs", "rou" to "ro", "hun" to "hu",
     "ukr" to "uk", "grc" to "el",
+    "usa" to "en", "gbr" to "en", "irl" to "en", "aus" to "en", "nzl" to "en",
     // Common full names
     "japan" to "ja", "south korea" to "ko", "korea" to "ko",
     "china" to "zh", "taiwan" to "zh", "france" to "fr",
@@ -645,4 +647,6 @@ private val COUNTRY_TO_LANGUAGE_MAP = mapOf(
     "denmark" to "da", "finland" to "fi", "thailand" to "th",
     "israel" to "he", "romania" to "ro", "hungary" to "hu",
     "ukraine" to "uk", "greece" to "el",
+    "united states" to "en", "united states of america" to "en", "united kingdom" to "en",
+    "ireland" to "en", "australia" to "en", "new zealand" to "en",
 )
