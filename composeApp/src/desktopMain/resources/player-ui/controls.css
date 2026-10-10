@@ -1952,10 +1952,13 @@ button:disabled {
 }
 
 .player-rail-modal {
+  /* Room for the bottom bar, which stays visible under the panel: the seek bar's top sits
+     --slider-bottom + 74px above the bottom (48px action row, 16px gap, 10px seek bar), plus a 16px gap. */
+  --rail-bottom-clearance: calc(var(--slider-bottom) + 90px);
   display: flex;
   align-items: flex-end;
   justify-content: flex-start;
-  padding: clamp(28px, 4vw, 52px) clamp(28px, 4vw, 52px) clamp(64px, 11vh, 124px);
+  padding: clamp(28px, 4vw, 52px) clamp(28px, 4vw, 52px) max(clamp(64px, 11vh, 124px), var(--rail-bottom-clearance));
   background:
     linear-gradient(90deg, rgba(0, 0, 0, .88) 0%, rgba(0, 0, 0, .66) 36%, transparent 82%),
     linear-gradient(180deg, rgba(0, 0, 0, .6) 0%, rgba(0, 0, 0, .34) 30%, rgba(0, 0, 0, .14) 60%, transparent 100%),
@@ -3350,7 +3353,7 @@ button.action:focus-visible {
   }
 
   .player-rail-modal {
-    padding: 28px 24px 64px;
+    padding: 28px 24px var(--rail-bottom-clearance);
   }
 
   .subtitle-rails {
@@ -3374,7 +3377,7 @@ button.action:focus-visible {
 @media (max-height: 680px) {
   .player-rail-modal {
     padding-top: 24px;
-    padding-bottom: 48px;
+    padding-bottom: var(--rail-bottom-clearance);
   }
 
   .player-rail-modal .track-header {
