@@ -562,8 +562,9 @@ button:disabled {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .16);
   border-radius: 16px;
-  background: rgba(30, 30, 30, .85);
+  background: rgb(24, 24, 24);
   color: var(--theme-control-foreground);
   opacity: 0;
   pointer-events: none;
@@ -602,17 +603,34 @@ button:disabled {
 .skip-prompt-label {
   padding-left: 8px;
   font-size: 14px;
+  font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
 }
 
+/* The prompt Enter triggers (and the hovered or keyboard-focused one): solid light button with the player's
+   focus ring, the look of a focused primary action. Flat: no shadow, the page is composited over the video. */
+.skip-prompt.is-default,
+.skip-prompt:hover,
+.skip-prompt:focus-visible {
+  border-color: var(--theme-control-foreground);
+  background: var(--theme-control-foreground);
+  color: #111;
+}
+
+.skip-prompt.is-default,
+.next-episode-card.is-default {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 3px;
+}
+
+/* Time left until the button hides: full at the start, empty when it goes (only while the controls are hidden). */
 .skip-progress-track {
   display: none;
   width: 100%;
   height: 3px;
   overflow: hidden;
-  border-radius: 0 0 16px 16px;
-  background: var(--theme-timeline-track);
+  background: rgba(128, 128, 128, .3);
 }
 
 .skip-prompt.show-progress .skip-progress-track {
@@ -620,9 +638,12 @@ button:disabled {
 }
 
 .skip-progress-fill {
-  width: 0%;
+  display: block;
+  width: 100%;
   height: 100%;
-  background: var(--theme-accent-gradient, var(--theme-timeline-fill));
+  background: currentColor;
+  opacity: .7;
+  transform-origin: left center;
 }
 
 .next-episode-card {
@@ -738,6 +759,13 @@ button:disabled {
   font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
+}
+
+.next-episode-card.playable:is(.is-default, :hover, :focus-visible) .next-episode-action {
+  border-color: var(--theme-control-foreground);
+  background: var(--theme-control-foreground);
+  color: #111;
+  font-weight: 600;
 }
 
 .next-episode-card:not(.playable) .next-episode-action {

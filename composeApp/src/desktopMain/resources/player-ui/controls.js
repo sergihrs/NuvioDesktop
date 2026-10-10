@@ -2158,24 +2158,51 @@ const renderPlaybackError = () => {
   return showError;
 };
 
+// Shown on screen right now: not auto-hidden, and not removed by a mode such as PiP (display: none).
+const isPlaybackPromptShown = element =>
+  element.classList.contains("visible") && element.getClientRects().length > 0;
+
+// The one prompt Enter acts on: the skip button, or else a playable next-episode card. The app hides the skip
+// button while a playable next episode is offered, so at the end of an episode there is only one of them.
+const playbackPromptEnterCommand = () => {
+  if (isPlaybackPromptShown(skipPrompt)) return "skipInterval";
+  if (isPlaybackPromptShown(nextEpisodeCard) && state.nextEpisodePlayable) return "playNextEpisode";
+  return "";
+};
+
+// Enter reaches the prompt only while no control has keyboard focus (focus sits on the player itself).
+const isShortcutRootFocused = () => {
+  const activeEl = document.activeElement;
+  return !activeEl || activeEl.tagName === "BODY" || activeEl === root;
+};
+
+// Mark the prompt Enter will trigger, with the player's focus ring, so the default action is visible.
+const syncPlaybackPromptDefault = () => {
+  const command = !activeModal && isShortcutRootFocused() ? playbackPromptEnterCommand() : "";
+  skipPrompt.classList.toggle("is-default", command === "skipInterval");
+  nextEpisodeCard.classList.toggle("is-default", command === "playNextEpisode");
+};
+
 const resetSkipPromptAutoHide = () => {
   window.clearTimeout(skipPromptAutoHideTimer);
   skipPromptAutoHideTimer = 0;
   skipPromptAutoHideActive = false;
   skipPromptAutoHidden = false;
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.transform = "scaleX(1)";
 };
 
 const startSkipPromptAutoHide = () => {
   if (skipPromptAutoHideActive || skipPromptAutoHidden) return;
   skipPromptAutoHideActive = true;
+  // The bar is a countdown: full when the timer starts, empty when the button hides. transform keeps the
+  // animation off layout (the page is composited over the video on every frame).
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.transform = "scaleX(1)";
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
-      skipPromptProgress.style.transition = `width ${skipPromptAutoHideDelayMs}ms linear`;
-      skipPromptProgress.style.width = "100%";
+      skipPromptProgress.style.transition = `transform ${skipPromptAutoHideDelayMs}ms linear`;
+      skipPromptProgress.style.transform = "scaleX(0)";
     });
   });
   skipPromptAutoHideTimer = window.setTimeout(() => {
@@ -2260,18 +2287,7 @@ const renderNativePlaybackPrompts = () => {
   nextEpisodeCard.classList.toggle("playable", Boolean(state.nextEpisodePlayable));
   nextEpisodeCard.classList.toggle("has-thumb", Boolean(nextThumbUrl));
   nextEpisodeCard.classList.toggle("blur-thumb", blurNextThumb);
-};
-
-// Shown on screen right now: not auto-hidden, and not removed by a mode such as PiP (display: none).
-const isPlaybackPromptShown = element =>
-  element.classList.contains("visible") && element.getClientRects().length > 0;
-
-// The one prompt Enter acts on: the skip button, or else a playable next-episode card. The app hides the skip
-// button while a playable next episode is offered, so at the end of an episode there is only one of them.
-const playbackPromptEnterCommand = () => {
-  if (isPlaybackPromptShown(skipPrompt)) return "skipInterval";
-  if (isPlaybackPromptShown(nextEpisodeCard) && state.nextEpisodePlayable) return "playNextEpisode";
-  return "";
+  syncPlaybackPromptDefault();
 };
 
 const isOpeningOverlayActive = () =>
@@ -2487,6 +2503,7 @@ const renderChrome = () => {
     nextEpisodeCard.classList.remove("visible");
     nextEpisodeCard.setAttribute("aria-hidden", "true");
     nextEpisodeCard.tabIndex = -1;
+    syncPlaybackPromptDefault();
   } else {
     renderNativePlaybackPrompts();
   }
@@ -2789,11 +2806,13 @@ document.addEventListener("focusin", event => {
   if (isChromeFocusInside) {
     noteChromeActivity(true);
   }
+  syncPlaybackPromptDefault();
 }, true);
 document.addEventListener("focusout", () => {
   window.setTimeout(() => {
     isChromeFocusInside = isChromeInteractionTarget(document.activeElement);
     noteChromeActivity(true);
+    syncPlaybackPromptDefault();
   }, 0);
 }, true);
 window.addEventListener("blur", () => {
@@ -3816,13 +3835,10 @@ document.addEventListener("keydown", event => {
   }
 
   const promptCommand = event.code === "Enter" ? playbackPromptEnterCommand() : "";
-  if (promptCommand) {
-    const activeEl = document.activeElement;
-    if (!activeEl || activeEl.tagName === "BODY" || activeEl === root) {
-      event.preventDefault();
-      send(promptCommand, 0);
-      return;
-    }
+  if (promptCommand && isShortcutRootFocused()) {
+    event.preventDefault();
+    send(promptCommand, 0);
+    return;
   }
   if (event.shiftKey && event.code === "KeyN") {
     event.preventDefault();
