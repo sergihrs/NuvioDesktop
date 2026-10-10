@@ -1157,7 +1157,7 @@
     <string name="settings_playback_option_default">Default (media file)</string>
     <string name="settings_playback_option_device_language">Device language</string>
     <string name="settings_playback_option_original">Original language</string>
-    <string name="settings_playback_option_original_hint">Requires TMDB enrichment to be enabled</string>
+    <string name="settings_playback_option_original_hint">The title&apos;s own language, from TMDB or addon details</string>
     <string name="settings_playback_option_forced">Forced</string>
     <string name="settings_playback_option_none">None</string>
     <string name="settings_playback_addon_subtitle_startup_all">All addon subtitles</string>
