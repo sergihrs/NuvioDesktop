@@ -185,6 +185,12 @@ button:disabled {
   transition-duration: 1ms !important;
 }
 
+/* The open panel's scrim covers these buttons: they would look active but every click lands on the scrim. */
+.player.modal-open .header-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .player.chrome-hidden .top-gradient,
 .player.chrome-hidden .bottom-gradient,
 .player.chrome-hidden .metadata,
