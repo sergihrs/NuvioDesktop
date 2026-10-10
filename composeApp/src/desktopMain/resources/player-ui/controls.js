@@ -461,6 +461,9 @@ const prefersReducedMotion = window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const modalTransitionMs = prefersReducedMotion ? 1 : 240;
 const chromeAutoHideDelayMs = 3500;
+// The skip button hides on its own after this long without the controls on screen. Reduced motion only drops
+// the countdown animation; the button must not disappear sooner.
+const skipPromptAutoHideDelayMs = 10000;
 const chromeActivityThrottleMs = 300;
 const hiddenCursorHideDelayMs = 3000;
 const cursorActivityThrottleMs = 100;
@@ -2171,7 +2174,7 @@ const startSkipPromptAutoHide = () => {
   skipPromptProgress.style.width = "0%";
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
-      skipPromptProgress.style.transition = `width ${prefersReducedMotion ? 1 : 10000}ms linear`;
+      skipPromptProgress.style.transition = `width ${skipPromptAutoHideDelayMs}ms linear`;
       skipPromptProgress.style.width = "100%";
     });
   });
@@ -2179,7 +2182,7 @@ const startSkipPromptAutoHide = () => {
     skipPromptAutoHideActive = false;
     skipPromptAutoHidden = true;
     renderNativePlaybackPrompts();
-  }, prefersReducedMotion ? 1 : 10000);
+  }, skipPromptAutoHideDelayMs);
 };
 
 const syncSkipPromptPlacement = showSkip => {
@@ -2226,7 +2229,8 @@ const renderNativePlaybackPrompts = () => {
 
   const shouldShowSkip = Boolean(state.skipPromptVisible && (!state.skipPromptDismissed || state.controlsVisible));
   const showSkip = Boolean(shouldShowSkip && (!skipPromptAutoHidden || state.controlsVisible));
-  const showSkipProgress = Boolean(showSkip && !state.controlsVisible && !skipPromptAutoHidden && !state.skipPromptDismissed);
+  const countSkipAutoHide = Boolean(showSkip && !state.controlsVisible && !skipPromptAutoHidden && !state.skipPromptDismissed);
+  const showSkipProgress = countSkipAutoHide && !prefersReducedMotion;
   skipPromptLabel.textContent = state.skipPromptLabel || "Skip";
   skipPrompt.setAttribute("aria-label", state.skipPromptLabel || "Skip");
   skipPrompt.setAttribute("aria-hidden", showSkip ? "false" : "true");
@@ -2234,7 +2238,7 @@ const renderNativePlaybackPrompts = () => {
   skipPrompt.classList.toggle("show-progress", showSkipProgress);
   skipPrompt.tabIndex = showSkip ? 0 : -1;
   syncSkipPromptPlacement(showSkip);
-  if (showSkipProgress) {
+  if (countSkipAutoHide) {
     startSkipPromptAutoHide();
   } else if (!showSkip || state.controlsVisible || state.skipPromptDismissed) {
     window.clearTimeout(skipPromptAutoHideTimer);
