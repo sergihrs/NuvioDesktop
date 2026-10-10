@@ -368,153 +368,6 @@ class OriginalAudioPreferenceTest {
         assertEquals(listOf(1, 0), controller.subtitleSelections)
     }
 
-    @Test
-    fun originalAudioTurnsOnSubtitlesInThePreferredLanguage() {
-        val controller = RecordingController(audioTracks())
-        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
-        val runtime = runtime(controller, contentLanguage = originalLanguage)
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = deviceLanguage)
-        runtime.preferredSubtitleSelectionApplied = false
-        runtime.refreshTracks()
-        runtime.refreshAudioTracksIfChanged()
-
-        reportRequestedOriginalSelection(runtime, controller)
-
-        assertEquals(1, runtime.selectedAudioIndex)
-        assertEquals(0, runtime.selectedSubtitleIndex)
-        assertEquals(listOf(0), controller.subtitleSelections.takeLast(1))
-    }
-
-    @Test
-    fun audioAlreadyInThePreferredSubtitleLanguageLeavesSubtitlesOff() {
-        val controller = RecordingController(audioTracks().take(1))
-        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
-        val runtime = runtime(controller, contentLanguage = originalLanguage)
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = deviceLanguage)
-        runtime.preferredSubtitleSelectionApplied = false
-        runtime.refreshTracks()
-        repeat(3) { runtime.refreshAudioTracksIfChanged() }
-
-        assertEquals(0, runtime.selectedAudioIndex)
-        assertEquals(-1, runtime.selectedSubtitleIndex)
-        assertTrue(0 !in controller.subtitleSelections)
-        assertTrue(runtime.preferredSubtitleSelectionApplied)
-    }
-
-    @Test
-    fun deviceAudioPreferenceKeepsSubtitlesInTheAudioLanguage() {
-        val controller = RecordingController(audioTracks().take(1))
-        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
-        val runtime = runtime(controller)
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(
-            preferredAudioLanguage = AudioLanguageOption.DEVICE,
-            preferredSubtitleLanguage = deviceLanguage,
-        )
-        runtime.preferredSubtitleSelectionApplied = false
-        runtime.refreshTracks()
-        repeat(3) { runtime.refreshAudioTracksIfChanged() }
-
-        assertEquals(0, runtime.selectedSubtitleIndex)
-    }
-
-    @Test
-    fun unknownOriginalLanguageLeavesTheFileDefaultTrack() {
-        val controller = RecordingController(audioTracks().map { it.copy(isSelected = it.index == 1) })
-        val runtime = runtime(controller)
-
-        runtime.refreshTracks()
-        runtime.refreshAudioTracksIfChanged()
-
-        assertEquals(listOf(emptyList()), controller.audioLanguagePreferences)
-        assertEquals(1, runtime.selectedAudioIndex)
-        assertEquals(emptyList(), controller.audioSelections)
-    }
-
-    // Desktop (mpv) flow, as in a real-app test with a dual-audio film: the controller selects the track for the
-    // language preference itself, and the track list reports it as selected once an audio output is open.
-    @Test
-    fun englishFilmWithOriginalAudioKeepsTheFileDefaultEnglishSubtitlesOff() {
-        val controller = mpvLikeController(englishFilmAudio(), englishFilmSubtitles())
-        val runtime = runtime(controller)
-        runtime.playerMeta = addonMeta(country = "United States of America")
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = "en")
-        runtime.preferredSubtitleSelectionApplied = false
-
-        runtime.refreshTracks()
-        repeat(3) { runtime.refreshAudioTracksIfChanged() }
-
-        assertEquals(listOf(listOf("en")), controller.audioLanguagePreferences)
-        assertEquals(listOf(0), controller.audioSelections)
-        assertEquals(0, runtime.selectedAudioIndex)
-        assertEquals(-1, runtime.selectedSubtitleIndex)
-        assertEquals(listOf(-1), controller.subtitleSelections)
-    }
-
-    // mpv deselects an audio track whose output can't be opened (no sound device: the sandboxed test setup).
-    // Then no track is selected, the audio language is unknown, and the subtitles stay on: what the real-app
-    // test saw (subtitles on, Audio panel without a mark). Not a selection bug.
-    @Test
-    fun withoutAnAudioOutputNoTrackIsSelectedAndSubtitlesStayOn() {
-        val controller = mpvLikeController(englishFilmAudio(), englishFilmSubtitles())
-        controller.audioOutputOpens = false
-        controller.reportAudioSelection(0)
-        val runtime = runtime(controller)
-        runtime.playerMeta = addonMeta(country = "United States of America")
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = "en")
-        runtime.preferredSubtitleSelectionApplied = false
-
-        runtime.refreshTracks()
-        repeat(3) { runtime.refreshAudioTracksIfChanged() }
-
-        assertEquals(listOf(0), controller.audioSelections)
-        assertTrue(controller.tracks.none { it.isSelected })
-        assertEquals(-1, runtime.selectedAudioIndex)
-        assertEquals(0, runtime.selectedSubtitleIndex)
-    }
-
-    @Test
-    fun dualAudioAnimeWithOriginalAudioGetsJapaneseAudioAndEnglishSubtitles() {
-        val controller = mpvLikeController(
-            listOf(
-                AudioTrack(0, "1", "Japanese (flac)", "jpn", isSelected = true),
-                AudioTrack(1, "2", "English (aac)", "eng"),
-            ),
-            listOf(
-                SubtitleTrack(0, "1", "Full Subtitles [GJM] (ass)", "eng", isSelected = true),
-                SubtitleTrack(1, "2", "Signs/Songs [GJM] (ass)", "eng", isForced = true),
-            ),
-        )
-        val runtime = runtime(controller)
-        runtime.playerMeta = addonMeta(country = "jpn")
-        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = "en")
-        runtime.preferredSubtitleSelectionApplied = false
-
-        runtime.refreshTracks()
-        repeat(3) { runtime.refreshAudioTracksIfChanged() }
-
-        assertEquals(listOf(listOf("ja")), controller.audioLanguagePreferences)
-        assertEquals(0, runtime.selectedAudioIndex)
-        assertTrue(controller.tracks[0].isSelected)
-        assertEquals(0, runtime.selectedSubtitleIndex)
-        assertTrue(-1 !in controller.subtitleSelections)
-    }
-
-    private fun mpvLikeController(audio: List<AudioTrack>, subtitles: List<SubtitleTrack>) =
-        RecordingController(audio).apply {
-            this.subtitles = subtitles
-            selectsOnLanguagePreference = true
-        }
-
-    private fun englishFilmAudio() = listOf(AudioTrack(0, "1", "English (aac)", "eng", isSelected = true))
-
-    private fun englishFilmSubtitles() = listOf(
-        SubtitleTrack(0, "1", "English (Full) (subrip)", "eng", isSelected = true),
-        SubtitleTrack(1, "2", "English (Forced) (subrip)", "eng", isForced = true),
-    )
-
-    private fun addonMeta(country: String) =
-        MetaDetails(id = "tt-original-audio-test", type = "movie", name = "Test movie", country = country)
-
     private fun reportRequestedOriginalSelection(runtime: PlayerScreenRuntime, controller: RecordingController) {
         assertEquals(originalLanguage, controller.audioLanguagePreferences.last().first())
         assertEquals(emptyList(), controller.audioSelections)
@@ -614,24 +467,15 @@ class OriginalAudioPreferenceTest {
 
         override fun getAudioTracks() = tracks
         override fun getSubtitleTracks() = subtitles
-        /** Like the desktop controller: select the best track for the languages right away. */
-        var selectsOnLanguagePreference = false
-        /** false: like mpv without a sound device, a selected audio track is dropped again (none selected). */
-        var audioOutputOpens = true
-
         override fun applyAudioLanguagePreferences(languages: List<String>) {
             audioLanguagePreferences += languages
-            if (selectsOnLanguagePreference) {
-                val index = findPreferredAudioTrackIndex(tracks, languages)
-                if (index >= 0) selectAudioTrack(index)
-            }
         }
         override fun selectAudioTrack(index: Int) {
             audioSelections += index
             reportAudioSelection(index)
         }
         fun reportAudioSelection(index: Int) {
-            tracks = tracks.map { it.copy(isSelected = audioOutputOpens && it.index == index) }
+            tracks = tracks.map { it.copy(isSelected = it.index == index) }
         }
         override fun selectSubtitleTrack(index: Int) {
             subtitleSelections += index

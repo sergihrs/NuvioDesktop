@@ -18,10 +18,6 @@ internal val PlayerScreenRuntime.preferredAudioLanguageTargets: List<String>
         contentOriginalLanguage = contentLanguage,
     )
 
-/** Preferred audio is "Original language": subtitles are only wanted when the audio is in another language. */
-internal val PlayerScreenRuntime.isOriginalAudioPreference: Boolean
-    get() = normalizeLanguageCode(playerSettingsUiState.preferredAudioLanguage) == AudioLanguageOption.ORIGINAL
-
 internal data class AppliedAudioPreferences(
     val controller: PlayerEngineController,
     val languages: List<String>,
