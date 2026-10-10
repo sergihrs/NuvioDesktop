@@ -185,6 +185,12 @@ button:disabled {
   transition-duration: 1ms !important;
 }
 
+/* The open panel's scrim covers these buttons: they would look active but every click lands on the scrim. */
+.player.modal-open .header-actions {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .player.chrome-hidden .top-gradient,
 .player.chrome-hidden .bottom-gradient,
 .player.chrome-hidden .metadata,
@@ -1959,7 +1965,8 @@ button:disabled {
 .player-rail-modal .track-panel {
   width: auto;
   max-width: calc(100vw - clamp(56px, 8vw, 104px));
-  max-height: calc(100vh - clamp(72px, 12vh, 128px));
+  /* Fit inside the layer's padding; a vh guess let tall rails push the title up against the top edge. */
+  max-height: 100%;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -2225,6 +2232,9 @@ button:disabled {
 .subtitle-rails {
   display: grid;
   grid-template-columns: 200px 300px;
+  grid-template-rows: minmax(0, 1fr);
+  flex: 0 1 auto;
+  min-height: 0;
   align-items: stretch;
   gap: 14px;
   max-width: 100%;
@@ -2254,6 +2264,7 @@ button:disabled {
 }
 
 .subtitle-rail-title {
+  flex-shrink: 0;
   overflow: hidden;
   color: var(--theme-text-muted);
   font-size: 14px;

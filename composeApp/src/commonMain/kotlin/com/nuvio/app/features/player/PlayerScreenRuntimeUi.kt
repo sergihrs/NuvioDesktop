@@ -970,8 +970,7 @@ internal fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: 
             skipIntervalDismissed = true
         }
         "playNextEpisode" -> {
-            if (nextEpisodeInfo?.hasAired == true) {
-                nextEpisodeAutoPlayJob?.cancel()
+            if (nextEpisodeInfo?.hasAired == true && !nextEpisodeAutoPlaySearching && nextEpisodeAutoPlayCountdown == null) {
                 playNextEpisode()
             }
         }
