@@ -75,6 +75,7 @@ internal fun resolveSubtitleAutoSelectionPlan(
     preferredAudioTargets: List<String>,
     preferredSubtitleTargets: List<String>,
     useForcedSubtitles: Boolean,
+    onlyForOtherAudioLanguage: Boolean = false,
 ): SubtitleAutoSelectionPlan? {
     if (useForcedSubtitles && selectedAudioTrack == null) return null
 
@@ -100,6 +101,18 @@ internal fun resolveSubtitleAutoSelectionPlan(
                 audioTrackMatchesLanguage(selectedAudioTrack, target)
             } -> selectedAudioLanguageTarget(selectedAudioTrack)
         else -> null
+    }
+
+    // Original-language audio with subtitles: the subtitles are a translation, so they stay off
+    // when the audio is already in the primary subtitle language (forced ones still apply).
+    if (
+        onlyForOtherAudioLanguage &&
+        forcedTarget == null &&
+        primarySubtitleTarget != null &&
+        selectedAudioTrack != null &&
+        audioTrackMatchesLanguage(selectedAudioTrack, primarySubtitleTarget)
+    ) {
+        return SubtitleAutoSelectionPlan(targets = emptyList(), mode = SubtitleAutoSelectionMode.NORMAL_ONLY)
     }
 
     return SubtitleAutoSelectionPlan(
