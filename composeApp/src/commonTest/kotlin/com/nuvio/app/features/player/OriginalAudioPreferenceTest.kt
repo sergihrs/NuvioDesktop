@@ -368,6 +368,68 @@ class OriginalAudioPreferenceTest {
         assertEquals(listOf(1, 0), controller.subtitleSelections)
     }
 
+    @Test
+    fun originalAudioTurnsOnSubtitlesInThePreferredLanguage() {
+        val controller = RecordingController(audioTracks())
+        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
+        val runtime = runtime(controller, contentLanguage = originalLanguage)
+        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = deviceLanguage)
+        runtime.preferredSubtitleSelectionApplied = false
+        runtime.refreshTracks()
+        runtime.refreshAudioTracksIfChanged()
+
+        reportRequestedOriginalSelection(runtime, controller)
+
+        assertEquals(1, runtime.selectedAudioIndex)
+        assertEquals(0, runtime.selectedSubtitleIndex)
+        assertEquals(listOf(0), controller.subtitleSelections.takeLast(1))
+    }
+
+    @Test
+    fun audioAlreadyInThePreferredSubtitleLanguageLeavesSubtitlesOff() {
+        val controller = RecordingController(audioTracks().take(1))
+        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
+        val runtime = runtime(controller, contentLanguage = originalLanguage)
+        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(preferredSubtitleLanguage = deviceLanguage)
+        runtime.preferredSubtitleSelectionApplied = false
+        runtime.refreshTracks()
+        repeat(3) { runtime.refreshAudioTracksIfChanged() }
+
+        assertEquals(0, runtime.selectedAudioIndex)
+        assertEquals(-1, runtime.selectedSubtitleIndex)
+        assertTrue(0 !in controller.subtitleSelections)
+        assertTrue(runtime.preferredSubtitleSelectionApplied)
+    }
+
+    @Test
+    fun deviceAudioPreferenceKeepsSubtitlesInTheAudioLanguage() {
+        val controller = RecordingController(audioTracks().take(1))
+        controller.subtitles = listOf(SubtitleTrack(0, "s1", "Full subtitles", deviceLanguage))
+        val runtime = runtime(controller)
+        runtime.playerSettingsUiState = runtime.playerSettingsUiState.copy(
+            preferredAudioLanguage = AudioLanguageOption.DEVICE,
+            preferredSubtitleLanguage = deviceLanguage,
+        )
+        runtime.preferredSubtitleSelectionApplied = false
+        runtime.refreshTracks()
+        repeat(3) { runtime.refreshAudioTracksIfChanged() }
+
+        assertEquals(0, runtime.selectedSubtitleIndex)
+    }
+
+    @Test
+    fun unknownOriginalLanguageLeavesTheFileDefaultTrack() {
+        val controller = RecordingController(audioTracks().map { it.copy(isSelected = it.index == 1) })
+        val runtime = runtime(controller)
+
+        runtime.refreshTracks()
+        runtime.refreshAudioTracksIfChanged()
+
+        assertEquals(listOf(emptyList()), controller.audioLanguagePreferences)
+        assertEquals(1, runtime.selectedAudioIndex)
+        assertEquals(emptyList(), controller.audioSelections)
+    }
+
     private fun reportRequestedOriginalSelection(runtime: PlayerScreenRuntime, controller: RecordingController) {
         assertEquals(originalLanguage, controller.audioLanguagePreferences.last().first())
         assertEquals(emptyList(), controller.audioSelections)

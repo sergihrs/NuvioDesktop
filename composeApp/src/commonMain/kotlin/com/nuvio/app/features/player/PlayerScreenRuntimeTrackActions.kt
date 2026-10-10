@@ -402,6 +402,7 @@ private fun PlayerScreenRuntime.tryAutoSelectPreferredSubtitleFromAvailableTrack
         preferredAudioTargets = preferredAudioTargets,
         preferredSubtitleTargets = preferredSubtitleTargets,
         useForcedSubtitles = subtitleStyle.useForcedSubtitles,
+        onlyForOtherAudioLanguage = isOriginalAudioPreference,
     )
     if (selectionPlan == null) {
         disableAutomaticSubtitleSelection()

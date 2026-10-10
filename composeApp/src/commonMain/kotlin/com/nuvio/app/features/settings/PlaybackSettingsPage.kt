@@ -1342,7 +1342,7 @@ private fun PlaybackSettingsSection(
     }
 
     if (showPreferredAudioDialog) {
-        val originalHint = stringResource(Res.string.settings_playback_option_original_hint)
+        val originalHint = stringResource(Res.string.settings_playback_option_original_primary_hint)
         LanguageSelectionDialog(
             title = stringResource(Res.string.settings_playback_preferred_audio_language),
             options = listOf(
