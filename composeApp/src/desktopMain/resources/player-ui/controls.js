@@ -2173,18 +2173,19 @@ const resetSkipPromptAutoHide = () => {
   skipPromptAutoHideActive = false;
   skipPromptAutoHidden = false;
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.width = "100%";
 };
 
 const startSkipPromptAutoHide = () => {
   if (skipPromptAutoHideActive || skipPromptAutoHidden) return;
   skipPromptAutoHideActive = true;
+  // The bar counts down the time until the button hides: full when it appears, empty when it goes.
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.width = "100%";
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       skipPromptProgress.style.transition = `width ${prefersReducedMotion ? 1 : 10000}ms linear`;
-      skipPromptProgress.style.width = "100%";
+      skipPromptProgress.style.width = "0%";
     });
   });
   skipPromptAutoHideTimer = window.setTimeout(() => {
