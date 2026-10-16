@@ -2186,7 +2186,7 @@ const startSkipPromptAutoHide = () => {
     skipPromptAutoHideActive = false;
     skipPromptAutoHidden = true;
     renderNativePlaybackPrompts();
-  }, prefersReducedMotion ? 1 : 10000);
+  }, 10000);
 };
 
 const syncSkipPromptPlacement = showSkip => {
