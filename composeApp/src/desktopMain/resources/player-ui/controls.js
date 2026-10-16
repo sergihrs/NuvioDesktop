@@ -414,6 +414,11 @@ let chromeInteractionLastNotedAt = 0;
 let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
+// A mouse click leaves the clicked control focused (WebKitGTK focuses buttons on press). That is not the user
+// moving focus with the keyboard, so it must not take Enter from the skip prompt.
+// pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
+let lastInputWasPointer = false;
+let pointerFocusedElement = null;
 let hiddenCursorTimer = 0;
 let hiddenCursorTemporarilyVisible = false;
 let cursorActivityLastSentAt = 0;
@@ -2269,6 +2274,12 @@ const renderNativePlaybackPrompts = () => {
 const isPlaybackPromptShown = element =>
   element.classList.contains("visible") && element.getClientRects().length > 0;
 
+// A control has keyboard focus (Tab, arrows), not focus left by a click: only then does Enter belong to it.
+const hasKeyboardControlFocus = () => {
+  const activeEl = document.activeElement;
+  return Boolean(activeEl && activeEl.tagName !== "BODY" && activeEl !== root && activeEl !== pointerFocusedElement);
+};
+
 const isOpeningOverlayActive = () =>
   Boolean((!hasReceivedPlayerControls || state.showOpeningOverlay) && state.isLoading);
 
@@ -2735,6 +2746,9 @@ const clearPressedButton = () => {
 };
 
 document.addEventListener("pointerdown", event => {
+  lastInputWasPointer = true;
+  // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
+  pointerFocusedElement = document.activeElement;
   if (event.button === 3) {
     showCommandToast("seekBack");
     send("seekBack", 0);
@@ -2779,6 +2793,12 @@ document.addEventListener("pointerleave", () => {
   updateChromePointerInside(false);
 }, true);
 document.addEventListener("focusin", event => {
+  if (lastInputWasPointer) {
+    pointerFocusedElement = event.target;
+  } else if (event.target !== pointerFocusedElement || event.relatedTarget) {
+    // Moved by keyboard. The same element regaining focus with the window (no relatedTarget) keeps its origin.
+    pointerFocusedElement = null;
+  }
   isChromeFocusInside = isChromeInteractionTarget(event.target);
   const actionButton = event.target.closest && event.target.closest(".action-pill .action");
   if (actionButton) {
@@ -3643,6 +3663,11 @@ document.addEventListener("keyup", event => {
   }
 });
 
+// Any key other than a lone modifier switches to keyboard input: focus it moves from now on is keyboard focus.
+document.addEventListener("keydown", event => {
+  if (!["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) lastInputWasPointer = false;
+}, true);
+
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && activeModal) {
     clearSpaceHoldTimerAndStopSpeedBoost();
@@ -3830,13 +3855,10 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (event.code === "Enter" && isPlaybackPromptShown(skipPrompt)) {
-    const activeEl = document.activeElement;
-    if (!activeEl || activeEl.tagName === "BODY" || activeEl === root) {
-      event.preventDefault();
-      send("skipInterval", 0);
-      return;
-    }
+  if (event.code === "Enter" && isPlaybackPromptShown(skipPrompt) && !hasKeyboardControlFocus()) {
+    event.preventDefault();
+    send("skipInterval", 0);
+    return;
   }
   if (event.shiftKey && event.code === "KeyN") {
     event.preventDefault();
