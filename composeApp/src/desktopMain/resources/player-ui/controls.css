@@ -746,6 +746,20 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* The prompt Enter triggers: the player's focus ring and a solid button, like a selected filter chip. */
+.skip-prompt.is-default,
+.next-episode-card.is-default {
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 3px;
+}
+
+.skip-prompt.is-default,
+.next-episode-card.is-default .next-episode-action {
+  border-color: transparent;
+  background: #fff;
+  color: #000;
+}
+
 .next-episode-card:not(.playable) .next-episode-action {
   color: var(--theme-control-foreground);
   opacity: .72;

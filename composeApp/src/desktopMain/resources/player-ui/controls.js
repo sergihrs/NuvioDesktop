@@ -415,7 +415,7 @@ let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
 // A mouse click leaves the clicked control focused (WebKitGTK focuses buttons on press). That is not the user
-// moving focus with the keyboard, so it must not take Enter from the skip prompt.
+// moving focus with the keyboard, so it must not take Enter from the skip / next-episode prompt.
 // pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
 let lastInputWasPointer = false;
 let pointerFocusedElement = null;
@@ -2268,6 +2268,7 @@ const renderNativePlaybackPrompts = () => {
   nextEpisodeCard.classList.toggle("playable", Boolean(state.nextEpisodePlayable));
   nextEpisodeCard.classList.toggle("has-thumb", Boolean(nextThumbUrl));
   nextEpisodeCard.classList.toggle("blur-thumb", blurNextThumb);
+  syncPlaybackPromptDefault();
 };
 
 // Shown on screen right now: not auto-hidden, and not removed by a mode such as PiP (display: none).
@@ -2278,6 +2279,21 @@ const isPlaybackPromptShown = element =>
 const hasKeyboardControlFocus = () => {
   const activeEl = document.activeElement;
   return Boolean(activeEl && activeEl.tagName !== "BODY" && activeEl !== root && activeEl !== pointerFocusedElement);
+};
+
+// The prompt Enter triggers: a playable next episode when its card is shown (also while the skip button for the
+// outro is, as in the TV app), otherwise the skip button.
+const playbackPromptEnterCommand = () => {
+  if (isPlaybackPromptShown(nextEpisodeCard) && state.nextEpisodePlayable) return "playNextEpisode";
+  if (isPlaybackPromptShown(skipPrompt)) return "skipInterval";
+  return "";
+};
+
+// Mark the prompt Enter will trigger. Enter does not reach it while a panel is open or a control has keyboard focus.
+const syncPlaybackPromptDefault = () => {
+  const command = !activeModal && !hasKeyboardControlFocus() ? playbackPromptEnterCommand() : "";
+  skipPrompt.classList.toggle("is-default", command === "skipInterval");
+  nextEpisodeCard.classList.toggle("is-default", command === "playNextEpisode");
 };
 
 const isOpeningOverlayActive = () =>
@@ -2749,6 +2765,7 @@ document.addEventListener("pointerdown", event => {
   lastInputWasPointer = true;
   // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
   pointerFocusedElement = document.activeElement;
+  syncPlaybackPromptDefault();
   if (event.button === 3) {
     showCommandToast("seekBack");
     send("seekBack", 0);
@@ -2807,11 +2824,13 @@ document.addEventListener("focusin", event => {
   if (isChromeFocusInside) {
     noteChromeActivity(true);
   }
+  syncPlaybackPromptDefault();
 }, true);
 document.addEventListener("focusout", () => {
   window.setTimeout(() => {
     isChromeFocusInside = isChromeInteractionTarget(document.activeElement);
     noteChromeActivity(true);
+    syncPlaybackPromptDefault();
   }, 0);
 }, true);
 window.addEventListener("blur", () => {
@@ -3855,9 +3874,10 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (event.code === "Enter" && isPlaybackPromptShown(skipPrompt) && !hasKeyboardControlFocus()) {
+  const promptCommand = event.code === "Enter" && !hasKeyboardControlFocus() ? playbackPromptEnterCommand() : "";
+  if (promptCommand) {
     event.preventDefault();
-    send("skipInterval", 0);
+    send(promptCommand, 0);
     return;
   }
   if (event.shiftKey && event.code === "KeyN") {
