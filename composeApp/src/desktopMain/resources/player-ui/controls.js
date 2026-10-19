@@ -415,8 +415,9 @@ let chromeInteractionLastNotedAt = 0;
 let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
-// A mouse click leaves the clicked control focused (WebKitGTK focuses buttons on press). That is not the user
-// moving focus with the keyboard, so it must not take Enter from the skip / next-episode prompt.
+// A mouse click leaves the clicked control focused (WebKitGTK and WebView2 focus buttons on press). That is not the
+// user moving focus with the keyboard, so it must not take Enter from the skip / next-episode prompt, and
+// Space/Enter must not press it again while a panel is open.
 // pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
 let lastInputWasPointer = false;
 let pointerFocusedElement = null;
@@ -963,6 +964,8 @@ const modalByName = {
   party: partyModal,
 };
 const modalElements = Object.values(modalByName);
+// The panels opened from the bottom bar. Space/Enter close them unless a control in them has keyboard focus.
+const playerPanels = new Set(["audio", "subtitles", "speed", "sources", "episodes"]);
 const modalCloseTimers = new Map();
 
 const setModalVisibility = (modal, visible, animated = true) => {
@@ -2302,7 +2305,7 @@ const renderNativePlaybackPrompts = () => {
 const isPlaybackPromptShown = element =>
   element.classList.contains("visible") && element.getClientRects().length > 0;
 
-// A control has keyboard focus (Tab, arrows), not focus left by a click: only then does Enter belong to it.
+// A control has keyboard focus (Tab, arrows), not focus left by a click: only then do Space/Enter belong to it.
 const hasKeyboardControlFocus = () => {
   const activeEl = document.activeElement;
   return Boolean(activeEl && activeEl.tagName !== "BODY" && activeEl !== root && activeEl !== pointerFocusedElement);
@@ -3733,7 +3736,14 @@ document.addEventListener("keyup", event => {
   if (event.code === "Space") {
     if (clearSpaceHoldTimerAndStopSpeedBoost()) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (activeModal || isTextEntryTarget(event.target)) return;
+    if (isTextEntryTarget(event.target)) return;
+    if (playerPanels.has(activeModal) && !hasKeyboardControlFocus()) {
+      event.preventDefault();
+      closePlayerModal(true);
+      focusShortcutRoot();
+      return;
+    }
+    if (activeModal) return;
     event.preventDefault();
     focusShortcutRoot();
     noteChromeActivity();
@@ -3930,6 +3940,16 @@ document.addEventListener("keydown", event => {
       sourceFilterId = "";
       openPlayerModal("sources");
       send("sources", 0);
+    }
+    return;
+  }
+
+  if (playerPanels.has(activeModal) && (event.code === "Enter" || event.code === "Space") && !hasKeyboardControlFocus()) {
+    // Space closes on release, like its play/pause tap; on press it must not click the focused control.
+    event.preventDefault();
+    if (event.code === "Enter") {
+      closePlayerModal(true);
+      focusShortcutRoot();
     }
     return;
   }
