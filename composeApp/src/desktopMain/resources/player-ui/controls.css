@@ -2538,24 +2538,33 @@ button:disabled {
 }
 
 
+/* The bar gets its own 12px gutter, kept even when the list fits, so it never covers the rows.
+   No scrollbar-width/scrollbar-color: with either set, WebKit and Chromium ignore the
+   ::-webkit-scrollbar rules and WebKitGTK/macOS draw an overlay bar over the content. */
 .audio-rail-panel .track-list,
 .subtitle-rail-panel .track-list,
 .subtitle-rail-panel .style-panel {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, .3) transparent;
+  overflow-y: scroll;
 }
 
 .audio-rail-panel .track-list::-webkit-scrollbar,
 .subtitle-rail-panel .track-list::-webkit-scrollbar,
 .subtitle-rail-panel .style-panel::-webkit-scrollbar {
-  width: 6px;
+  width: 12px;
 }
 
 .audio-rail-panel .track-list::-webkit-scrollbar-thumb,
 .subtitle-rail-panel .track-list::-webkit-scrollbar-thumb,
 .subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .3);
+  background: rgba(255, 255, 255, .3) padding-box;
+}
+
+.audio-rail-panel .track-list::-webkit-scrollbar-thumb:hover,
+.subtitle-rail-panel .track-list::-webkit-scrollbar-thumb:hover,
+.subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb:hover {
+  border-width: 2px;
 }
 
 .player-side-panel .track-list {
