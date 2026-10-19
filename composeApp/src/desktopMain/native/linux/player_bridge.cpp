@@ -65,7 +65,7 @@ struct Player {
     Window overlayXid = 0;   // controls window, composite-redirected offscreen
                              // (invisible on screen but still receives input)
     guint updateTimer = 0;    // 200ms: state push + input raise
-    guint compositeTimer = 0; // fast: snapshot controls page -> mpv overlay
+    guint compositeTimer = 0; // fast: composite gate, controls frames -> mpv overlay
     bool overlayActive = true;   // controls currently visible/interacting
     int fadeTicks = 0;           // extra composite ticks to render the fade-out
     bool overlayPushed = false;  // an overlay is currently set on mpv
@@ -74,6 +74,23 @@ struct Player {
     GdkCursor *cursorVisible = nullptr;  // "default", owned
     GdkCursor *cursorHidden = nullptr;   // blank, owned
     bool cursorIsHidden = false;
+    // Where controls frames come from (decided when the webview is created, see
+    // overlayUsesBackingStore). Backing-store mode: a device-size copy of the page
+    // kept up to date from WebKit's UI-process backing store, repainted only where
+    // WebKit invalidated the view and pushed to mpv only after such a change.
+    bool useBackingStore = false;
+    cairo_surface_t *frame = nullptr;   // premultiplied ARGB32, what mpv was last given
+    cairo_surface_t *paintBuf = nullptr;  // same size: damaged areas are painted here first
+    cairo_region_t *damage = nullptr;   // view (logical px) invalidated since the last push
+    GdkWindow *damageWindow = nullptr;  // view window carrying our invalidate handler (weak)
+    bool needsFullFrame = true;         // repaint everything on the next push
+    bool verifyFrame = false;           // repaint everything, push only if it differs
+    int viewW = 0, viewH = 0;           // view allocation seen by the last tick
+    gint64 settleUntilUs = 0;           // after a resize: verify every tick until then
+    gint64 lastVerifyUs = 0;
+    bool gateOpen = false;              // composite gate state at the last tick
+    guint flushSource = 0;              // pending, rate-limited push
+    gint64 lastFlushUs = 0;
     // Async WebKit snapshot of the controls page (premultiplied ARGB32 with real
     // alpha). Reading the redirected window's X pixmap instead is renderer- and
     // driver-dependent: on NVIDIA the dmabuf renderer leaves the pixmap empty and
@@ -499,6 +516,8 @@ void onPlayerMessage(WebKitUserContentManager *, WebKitJavascriptResult *js, gpo
     if (valV) g_object_unref(valV);
 }
 
+void unwatchViewDamage(Player *player);  // backing-store frames, below
+
 // The overlay toplevel is a child of the AWT canvas at the X level, and player
 // close races Compose's canvas teardown against dispose(): when AWT destroys
 // the canvas first, X cascade-destroys the overlay's window, GDK reports it
@@ -509,17 +528,226 @@ void onPlayerMessage(WebKitUserContentManager *, WebKitJavascriptResult *js, gpo
 void onOverlayDestroyed(GtkWidget *, gpointer data) {
     auto *player = static_cast<Player *>(data);
     NUVIO_LOG("overlay toplevel destroyed (host teardown or dispose)");
+    unwatchViewDamage(player);
     player->gtkWindow = nullptr;
     player->webview = nullptr;
     player->overlayXid = 0;
 }
 
-// Free the snapshot buffers (safe to call with none allocated). Only after
-// overlay-remove or teardown — mpv's overlay points into snapSurf's data.
+// Free the overlay buffers (safe to call with none allocated). The snapshots
+// only after overlay-remove or teardown — mpv's overlay points into snapSurf's data.
 void releaseSnapshots(Player *player) {
     if (player->snapSurf) cairo_surface_destroy(player->snapSurf);
     if (player->snapSurfPrev) cairo_surface_destroy(player->snapSurfPrev);
     player->snapSurf = player->snapSurfPrev = nullptr;
+    // Backing-store mode: the next push rebuilds the whole frame.
+    if (player->frame) cairo_surface_destroy(player->frame);
+    if (player->paintBuf) cairo_surface_destroy(player->paintBuf);
+    player->frame = player->paintBuf = nullptr;
+    player->needsFullFrame = true;
+}
+
+// ---- Backing-store frames (default overlay source) -------------------------
+// webkit_web_view_get_snapshot makes the web process paint the WHOLE page again
+// for every request: at 30 requests/s that kept WebKit's main thread near 100%
+// of a core whenever the controls were up (worse with the panels' backdrop blur
+// at HiDPI), even when nothing on the page changed. WebKit already keeps the
+// rendered page in the UI process: with compositing disabled (forced in
+// createWebviewOnGtk) it paints only what changed into a backing store and
+// invalidates exactly that part of the view. So: copy only the invalidated
+// region from that backing store (gtk_widget_draw, clipped) and push to mpv
+// only when the pixels actually changed. A still page costs no web-process
+// work and no mpv upload. Same pixels and alpha as the snapshot (both are
+// WebKit's software paint with a transparent background).
+
+// Accelerated compositing draws the view from a GPU buffer instead (the
+// dark-wall alpha problems described at the setenv in createWebviewOnGtk), so
+// this mode needs WebKit's non-composited mode. WebKit treats any value other
+// than "0" as "disabled". NUVIO_OVERLAY_SNAPSHOT=1 keeps the old per-frame
+// snapshot pipeline (escape hatch / comparison).
+bool overlayUsesBackingStore() {
+    const char *forced = getenv("NUVIO_OVERLAY_SNAPSHOT");
+    if (forced && *forced && strcmp(forced, "0") != 0) return false;
+    const char *noCompositing = getenv("WEBKIT_DISABLE_COMPOSITING_MODE");
+    return noCompositing && *noCompositing && strcmp(noCompositing, "0") != 0;
+}
+
+// Pushes are coalesced and capped at ~60/s: WebKit invalidates once per page
+// frame, and mpv redraws the video for every overlay change.
+constexpr gint64 kMinFramePushIntervalUs = 16000;
+const char kDamagePlayerKey[] = "nuvio-overlay-player";
+
+gboolean flushOverlayFrame(gpointer data);
+
+void scheduleOverlayFrame(Player *player) {
+    if (player->flushSource) return;
+    gint64 wait = player->lastFlushUs + kMinFramePushIntervalUs - g_get_monotonic_time();
+    guint delayMs = wait > 0 ? (guint)((wait + 999) / 1000) : 0;
+    player->flushSource = g_timeout_add(delayMs, flushOverlayFrame, player);
+}
+
+// GDK calls this synchronously for every invalidation of the view's window —
+// WebKit invalidates exactly what it repainted (gtk_widget_queue_draw_area), and
+// GDK reports it here whether or not GTK ever paints this redirected window (its
+// frame clock may stall on some compositors; see compositeOverlay).
+void onViewInvalidated(GdkWindow *window, cairo_region_t *region) {
+    auto *player = static_cast<Player *>(g_object_get_data(G_OBJECT(window), kDamagePlayerKey));
+    if (!player || !playerAlive(player) || !player->gateOpen) return;
+    if (!player->damage) player->damage = cairo_region_create();
+    cairo_region_union(player->damage, region);
+    scheduleOverlayFrame(player);
+}
+
+void unwatchViewDamage(Player *player) {
+    if (!player->damageWindow) return;
+    GdkWindow *w = player->damageWindow;
+    g_object_remove_weak_pointer(G_OBJECT(w), reinterpret_cast<gpointer *>(&player->damageWindow));
+    player->damageWindow = nullptr;
+    gdk_window_set_invalidate_handler(w, nullptr);
+    g_object_set_data(G_OBJECT(w), kDamagePlayerKey, nullptr);
+}
+
+// (Re)attach the invalidate handler to the view's current window. Cheap when
+// nothing changed; called every composite tick so a re-realized view is picked
+// up (with a full repaint, since its damage before that was not seen).
+void watchViewDamage(Player *player) {
+    GdkWindow *w = player->webview ? gtk_widget_get_window(GTK_WIDGET(player->webview)) : nullptr;
+    if (w == player->damageWindow) return;
+    unwatchViewDamage(player);
+    if (!w) return;
+    g_object_set_data(G_OBJECT(w), kDamagePlayerKey, player);
+    gdk_window_set_invalidate_handler(w, onViewInvalidated);
+    player->damageWindow = w;
+    g_object_add_weak_pointer(G_OBJECT(w), reinterpret_cast<gpointer *>(&player->damageWindow));
+    player->needsFullFrame = true;
+}
+
+// Bring the frame up to date with the view and hand it to mpv. GTK thread.
+void pushOverlayFrame(Player *player) {
+    if (!player->gateOpen || !player->webview || !player->mpv || !player->gtkWindow ||
+        !player->overlayXid) {
+        return;
+    }
+    GtkWidget *view = GTK_WIDGET(player->webview);
+    GdkWindow *ovGw = gtk_widget_get_window(player->gtkWindow);
+    if (!ovGw || !gtk_widget_get_realized(view)) return;
+    const int scale = std::max(1, gtk_widget_get_scale_factor(view));
+    const int lw = gtk_widget_get_allocated_width(view);
+    const int lh = gtk_widget_get_allocated_height(view);
+    if (lw <= 1 || lh <= 1) return;
+    const int w = lw * scale, h = lh * scale;
+    // Same stale-size rule as the snapshot path: while the view and the overlay
+    // window disagree (resize in flight) a frame would put mis-scaled controls
+    // over the video. Keep the damage; the composite tick retries (and
+    // re-checks the whole view for a while after a size change).
+    XWindowAttributes wa;
+    if (!XGetWindowAttributes(GDK_WINDOW_XDISPLAY(ovGw), player->overlayXid, &wa) ||
+        wa.width != w || wa.height != h) {
+        return;
+    }
+    if (!player->frame || cairo_image_surface_get_width(player->frame) != w ||
+        cairo_image_surface_get_height(player->frame) != h) {
+        releaseSnapshots(player);  // frees both buffers, requests a full frame
+        player->frame = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+        player->paintBuf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, w, h);
+        if (cairo_surface_status(player->frame) != CAIRO_STATUS_SUCCESS ||
+            cairo_surface_status(player->paintBuf) != CAIRO_STATUS_SUCCESS) {
+            releaseSnapshots(player);
+            return;
+        }
+        // Paint in the view's logical coordinates (= GDK/WebKit damage units).
+        cairo_surface_set_device_scale(player->paintBuf, scale, scale);
+    }
+    cairo_region_t *dirty = player->damage;
+    player->damage = nullptr;
+    if (player->needsFullFrame || player->verifyFrame) {
+        if (dirty) cairo_region_destroy(dirty);
+        cairo_rectangle_int_t all = {0, 0, lw, lh};
+        dirty = cairo_region_create_rectangle(&all);
+    } else if (!dirty || cairo_region_is_empty(dirty)) {
+        if (dirty) cairo_region_destroy(dirty);
+        return;  // nothing changed since the last push
+    }
+    if (!gtk_widget_get_has_window(view)) {
+        // Damage arrived in the coordinates of a window the view shares.
+        GtkAllocation alloc;
+        gtk_widget_get_allocation(view, &alloc);
+        cairo_region_translate(dirty, -alloc.x, -alloc.y);
+    }
+    cairo_t *cr = cairo_create(player->paintBuf);
+    gdk_cairo_region(cr, dirty);
+    cairo_clip(cr);
+    cairo_set_operator(cr, CAIRO_OPERATOR_CLEAR);  // transparent where the page is
+    cairo_paint(cr);
+    cairo_set_operator(cr, CAIRO_OPERATOR_OVER);
+    gtk_widget_draw(view, cr);
+    cairo_destroy(cr);
+    cairo_surface_flush(player->paintBuf);
+    // Move the repainted rows that really differ into the frame. WebKit often
+    // repaints areas whose pixels end up identical (e.g. the page rewriting
+    // hidden elements on every state update); those must not cost an mpv
+    // upload and video redraw.
+    const int stride = cairo_image_surface_get_stride(player->frame);
+    unsigned char *dst = cairo_image_surface_get_data(player->frame);
+    const unsigned char *src = cairo_image_surface_get_data(player->paintBuf);
+    bool changed = player->needsFullFrame || !player->overlayPushed;
+    for (int i = 0, n = cairo_region_num_rectangles(dirty); i < n; ++i) {
+        cairo_rectangle_int_t r;
+        cairo_region_get_rectangle(dirty, i, &r);
+        const int x0 = std::max(0, r.x * scale), x1 = std::min(w, (r.x + r.width) * scale);
+        const int y0 = std::max(0, r.y * scale), y1 = std::min(h, (r.y + r.height) * scale);
+        if (x0 >= x1 || y0 >= y1) continue;
+        const size_t off = (size_t)x0 * 4, len = (size_t)(x1 - x0) * 4;
+        for (int y = y0; y < y1; ++y) {
+            const size_t row = (size_t)y * stride + off;
+            if (memcmp(dst + row, src + row, len) != 0) {
+                memcpy(dst + row, src + row, len);
+                changed = true;
+            }
+        }
+    }
+    cairo_region_destroy(dirty);
+    player->needsFullFrame = false;
+    player->verifyFrame = false;
+    if (!changed) return;
+    // mpv copies the pixels before overlay-add returns (mpv >= 0.18.1), so the
+    // frame can be repainted right after.
+    char addr[32], sw[16], sh[16], sstride[16];
+    snprintf(addr, sizeof addr, "&%zu", (size_t)(uintptr_t)cairo_image_surface_get_data(player->frame));
+    snprintf(sw, sizeof sw, "%d", w);
+    snprintf(sh, sizeof sh, "%d", h);
+    snprintf(sstride, sizeof sstride, "%d", cairo_image_surface_get_stride(player->frame));
+    const char *cmd[] = {"overlay-add", "0", "0", "0", addr, "0", "bgra", sw, sh, sstride, nullptr};
+    mpv_command(player->mpv, cmd);
+    player->overlayPushed = true;
+    player->lastFlushUs = g_get_monotonic_time();
+}
+
+gboolean flushOverlayFrame(gpointer data) {
+    auto *player = static_cast<Player *>(data);
+    // Teardown removes this source before freeing the player; this only guards
+    // process exit.
+    if (!playerAlive(player)) return G_SOURCE_REMOVE;
+    player->flushSource = 0;
+    pushOverlayFrame(player);
+    return G_SOURCE_REMOVE;
+}
+
+// Composite gate closed (or teardown): forget pending work; a reopened gate
+// starts from a full frame.
+void closeOverlayGate(Player *player) {
+    player->gateOpen = false;
+    if (player->flushSource) {
+        // May have run (and bailed) already during dispose; only remove a live source.
+        GSource *src = g_main_context_find_source_by_id(nullptr, player->flushSource);
+        if (src && !g_source_is_destroyed(src)) g_source_remove(player->flushSource);
+        player->flushSource = 0;
+    }
+    if (player->damage) {
+        cairo_region_destroy(player->damage);
+        player->damage = nullptr;
+    }
+    player->needsFullFrame = true;
 }
 
 // Ties a snapshot request to the generation it was issued under, so callbacks
@@ -594,8 +822,8 @@ void onOverlaySnapshot(GObject *src, GAsyncResult *res, gpointer data) {
     player->snapSurf = surf;
 }
 
-// Snapshot the controls page (premultiplied BGRA with real alpha) and hand it
-// to mpv as an OSD overlay, so mpv blends the HTML controls over the video in its
+// Hand the controls page (premultiplied BGRA with real alpha) to mpv as an
+// OSD overlay, so mpv blends the HTML controls over the video in its
 // single window (XWayland won't alpha-blend sibling windows; mpv does the compose
 // that Core Animation / DWM do on macOS / Windows). Only runs while the chrome is
 // visible (plus a short fade-out grace) so normal watching pays nothing.
@@ -671,6 +899,7 @@ void compositeOverlay(Player *player) {
         }
     }
     if (!active) {
+        if (player->useBackingStore) closeOverlayGate(player);
         if (player->overlayPushed) {
             const char *rm[] = {"overlay-remove", "0", nullptr};
             mpv_command(player->mpv, rm);
@@ -679,7 +908,38 @@ void compositeOverlay(Player *player) {
         }
         return;
     }
-    if (!player->snapInFlight && player->webview) {
+    if (player->useBackingStore) {
+        // Damage-driven: frames are pushed from onViewInvalidated. The tick only
+        // opens the gate (full frame first) and retries a push that could not
+        // happen yet (resize in flight, overlay taken down above).
+        if (!player->gateOpen) {
+            player->gateOpen = true;
+            player->needsFullFrame = true;
+        }
+        watchViewDamage(player);
+        // Safety net for content changes that arrive without an invalidation
+        // of the view: after a resize WebKit swaps in the backing store for the
+        // new size after GTK already invalidated (and we already painted the
+        // stale one). Re-check the whole view every tick for a second after a
+        // size change and once a second otherwise; identical pixels are not
+        // pushed, so a still page stays free apart from the repaint.
+        gint64 now = g_get_monotonic_time();
+        GtkWidget *view = GTK_WIDGET(player->webview);
+        int vw = view ? gtk_widget_get_allocated_width(view) : 0;
+        int vh = view ? gtk_widget_get_allocated_height(view) : 0;
+        if (vw != player->viewW || vh != player->viewH) {
+            player->viewW = vw;
+            player->viewH = vh;
+            player->settleUntilUs = now + 1000000;
+        }
+        if (now < player->settleUntilUs || now - player->lastVerifyUs >= 1000000) {
+            player->lastVerifyUs = now;
+            player->verifyFrame = true;
+        }
+        bool pending = player->needsFullFrame || player->verifyFrame || !player->overlayPushed ||
+                       (player->damage && !cairo_region_is_empty(player->damage));
+        if (pending) scheduleOverlayFrame(player);
+    } else if (!player->snapInFlight && player->webview) {
         if (player->snapCooldownTicks > 0) {
             // Backing off after a watchdog reset: a stalled web process gets no
             // relief from being asked again immediately.
@@ -1127,6 +1387,7 @@ gboolean createWebviewOnGtk(gpointer data) {
                          p->snapWaitTicks = 0;
                          p->snapCooldownTicks = 0;
                          p->snapResets = 0;
+                         p->needsFullFrame = true;
                          webkit_web_view_reload(view);
                      }),
                      player);
@@ -1273,8 +1534,14 @@ gboolean createWebviewOnGtk(gpointer data) {
     player->webview = wv;
     player->hostXid = s->hostXid;
     g_signal_connect(win, "destroy", G_CALLBACK(onOverlayDestroyed), player);
+    player->useBackingStore = overlayUsesBackingStore();
+    NUVIO_LOG("controls frames from %s", player->useBackingStore
+                                             ? "the view's backing store (damage-driven)"
+                                             : "per-frame webview snapshots");
     player->updateTimer = g_timeout_add(200, pushPlayerUpdate, player);
-    player->compositeTimer = g_timeout_add(33, compositeTick, player);  // ~30fps when active
+    // Gate/geometry tick; frames themselves are damage-driven in backing-store
+    // mode (snapshot mode: one snapshot per tick, ~30fps, while active).
+    player->compositeTimer = g_timeout_add(33, compositeTick, player);
 
     // Grab the keyboard for the page from the start (macOS grabs first-responder
     // at creation, Windows MoveFocus()es on controller setup) — the page's own
@@ -1377,6 +1644,8 @@ gboolean destroyWebviewOnGtk(gpointer data) {
         player->compositeTimer = 0;
     }
     player->snapGen++;  // drop any in-flight snapshot callback
+    closeOverlayGate(player);
+    unwatchViewDamage(player);
     if (player->snapCancel) {
         g_cancellable_cancel(player->snapCancel);
         g_object_unref(player->snapCancel);
