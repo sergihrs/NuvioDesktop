@@ -2198,19 +2198,20 @@ const resetSkipPromptAutoHide = () => {
   skipPromptAutoHideActive = false;
   skipPromptAutoHidden = false;
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "100%";
+  skipPromptProgress.style.transform = "scaleX(1)";
 };
 
 const startSkipPromptAutoHide = () => {
   if (skipPromptAutoHideActive || skipPromptAutoHidden) return;
   skipPromptAutoHideActive = true;
-  // The bar counts down the time until the button hides: full when it appears, empty when it goes.
+  // The bar counts down the time until the button hides: full when it appears, empty when it goes. transform keeps
+  // the animation off layout (the page is composited over the video on every frame).
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "100%";
+  skipPromptProgress.style.transform = "scaleX(1)";
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
-      skipPromptProgress.style.transition = `width ${prefersReducedMotion ? 1 : 10000}ms linear`;
-      skipPromptProgress.style.width = "0%";
+      skipPromptProgress.style.transition = `transform ${prefersReducedMotion ? 1 : 10000}ms linear`;
+      skipPromptProgress.style.transform = "scaleX(0)";
     });
   });
   skipPromptAutoHideTimer = window.setTimeout(() => {
