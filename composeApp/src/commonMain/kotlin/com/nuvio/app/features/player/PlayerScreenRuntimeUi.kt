@@ -1016,6 +1016,7 @@ internal fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: 
             } else {
                 playerController?.selectSubtitleTrack(index)
             }
+            syncSubtitleTrackSelection(index)
         }
         "selectAudioTrack" -> {
             // The controls webview sends the track id (trackIdValue); map it back
@@ -1045,6 +1046,7 @@ internal fun PlayerScreenRuntime.handlePlayerControlsEvent(type: String, value: 
             preferredSubtitleSelectionApplied = true
             persistAddonSubtitlePreference(addon)
             playerController?.setSubtitleUri(addon.url)
+            syncSubtitleTrackSelection(-1)
         }
         "subtitleDelayDelta" -> setSubtitleDelay((subtitleDelayMs + value.toInt()).coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS))
         "subtitleDelayReset" -> setSubtitleDelay(0)
@@ -1784,6 +1786,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
                 } else {
                     playerController?.selectSubtitleTrack(index)
                 }
+                syncSubtitleTrackSelection(index)
                 if (hasBurnedInServerSubtitle) clearServerSubtitleTrack()
             }
         },
@@ -1795,6 +1798,7 @@ private fun PlayerScreenRuntime.RenderPlayerModals(displayedPositionMs: Long) {
             preferredSubtitleSelectionApplied = true
             persistAddonSubtitlePreference(addon)
             attachSelectedAddonSubtitleWithAutoSync(addon.url) // AutoSync hook
+            syncSubtitleTrackSelection(-1)
             if (hasBurnedInServerSubtitle) clearServerSubtitleTrack()
         },
         onFetchAddonSubtitles = { fetchAddonSubtitlesForActiveItem() },
