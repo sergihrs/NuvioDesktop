@@ -414,6 +414,11 @@ let chromeInteractionLastNotedAt = 0;
 let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
+// A mouse click leaves the clicked control focused (WebKitGTK and WebView2 focus buttons on press). That is not the
+// user moving focus with the keyboard, so Space/Enter must not press it again while a panel is open.
+// pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
+let lastInputWasPointer = false;
+let pointerFocusedElement = null;
 let hiddenCursorTimer = 0;
 let hiddenCursorTemporarilyVisible = false;
 let cursorActivityLastSentAt = 0;
@@ -957,6 +962,8 @@ const modalByName = {
   party: partyModal,
 };
 const modalElements = Object.values(modalByName);
+// The panels opened from the bottom bar. Space/Enter close them unless a control in them has keyboard focus.
+const playerPanels = new Set(["audio", "subtitles", "speed", "sources", "episodes"]);
 const modalCloseTimers = new Map();
 
 const setModalVisibility = (modal, visible, animated = true) => {
@@ -2501,6 +2508,12 @@ const focusShortcutRoot = () => {
   }
 };
 
+// A control has keyboard focus (Tab, arrows), not focus left by a click: only then do Space/Enter belong to it.
+const hasKeyboardControlFocus = () => {
+  const activeEl = document.activeElement;
+  return Boolean(activeEl && activeEl.tagName !== "BODY" && activeEl !== root && activeEl !== pointerFocusedElement);
+};
+
 const isTextEntryTarget = target => {
   const element = target && target.closest && target.closest("input, textarea, select, [contenteditable='true']");
   return Boolean(element && element.type !== "range");
@@ -2753,6 +2766,9 @@ const clearPressedButton = () => {
 };
 
 document.addEventListener("pointerdown", event => {
+  lastInputWasPointer = true;
+  // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
+  pointerFocusedElement = document.activeElement;
   if (event.button === 3) {
     showCommandToast("seekBack");
     send("seekBack", 0);
@@ -2797,6 +2813,12 @@ document.addEventListener("pointerleave", () => {
   updateChromePointerInside(false);
 }, true);
 document.addEventListener("focusin", event => {
+  if (lastInputWasPointer) {
+    pointerFocusedElement = event.target;
+  } else if (event.target !== pointerFocusedElement || event.relatedTarget) {
+    // Moved by keyboard. The same element regaining focus with the window (no relatedTarget) keeps its origin.
+    pointerFocusedElement = null;
+  }
   isChromeFocusInside = isChromeInteractionTarget(event.target);
   const actionButton = event.target.closest && event.target.closest(".action-pill .action");
   if (actionButton) {
@@ -3656,13 +3678,25 @@ document.addEventListener("keyup", event => {
   if (event.code === "Space") {
     if (clearSpaceHoldTimerAndStopSpeedBoost()) return;
     if (event.metaKey || event.ctrlKey || event.altKey) return;
-    if (activeModal || isTextEntryTarget(event.target)) return;
+    if (isTextEntryTarget(event.target)) return;
+    if (playerPanels.has(activeModal) && !hasKeyboardControlFocus()) {
+      event.preventDefault();
+      closePlayerModal(true);
+      focusShortcutRoot();
+      return;
+    }
+    if (activeModal) return;
     event.preventDefault();
     focusShortcutRoot();
     noteChromeActivity();
     requestPlaybackState("setPlaybackStateQuiet", false);
   }
 });
+
+// Any key other than a lone modifier switches to keyboard input: focus it moves from now on is keyboard focus.
+document.addEventListener("keydown", event => {
+  if (!["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) lastInputWasPointer = false;
+}, true);
 
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && isPartyConfirmOpen()) {
@@ -3848,6 +3882,16 @@ document.addEventListener("keydown", event => {
       sourceFilterId = "";
       openPlayerModal("sources");
       send("sources", 0);
+    }
+    return;
+  }
+
+  if (playerPanels.has(activeModal) && (event.code === "Enter" || event.code === "Space") && !hasKeyboardControlFocus()) {
+    // Space closes on release, like its play/pause tap; on press it must not click the focused control.
+    event.preventDefault();
+    if (event.code === "Enter") {
+      closePlayerModal(true);
+      focusShortcutRoot();
     }
     return;
   }
