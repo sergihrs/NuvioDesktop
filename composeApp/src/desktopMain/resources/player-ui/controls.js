@@ -82,6 +82,7 @@ const audioPanelTitle = document.getElementById("audioPanelTitle");
 const audioTrackList = document.getElementById("audioTrackList");
 const subtitleTrackList = document.getElementById("subtitleTrackList");
 const subtitlePanelTitle = document.getElementById("subtitlePanelTitle");
+const panelCloseButtons = Array.from(document.querySelectorAll(".panel-close-button"));
 const subtitleLanguageRailTitle = document.getElementById("subtitleLanguageRailTitle");
 const subtitleOptionsRailTitle = document.getElementById("subtitleOptionsRailTitle");
 const subtitleStyleRail = document.getElementById("subtitleStyleRail");
@@ -2077,6 +2078,11 @@ const renderP2pConsentModal = () => {
 };
 
 const renderActiveModal = (modalOpened = false) => {
+  const panelCloseLabel = state.panelCloseLabel || "Close";
+  panelCloseButtons.forEach(button => {
+    button.setAttribute("aria-label", panelCloseLabel);
+    button.title = `${panelCloseLabel} (Esc)`;
+  });
   if (activeModal === "audio") renderAudioTrackList();
   if (activeModal === "subtitles") renderSubtitleModal();
   if (activeModal === "speed") renderSpeedOptionList();
@@ -2449,6 +2455,7 @@ const renderChrome = () => {
   if (!state.isInPip && isPipLocked) setPipLocked(false);
   root.classList.toggle("chrome-hidden", Boolean(showError || !state.controlsVisible));
   root.classList.toggle("modal-open", Boolean(activeModal));
+  root.classList.toggle("rail-panel-open", Boolean(activeModal && modalByName[activeModal].classList.contains("player-rail-modal")));
   root.classList.toggle("source-visible", Boolean(!showError && !isPlaying && !state.isLoading && (state.streamTitle || state.providerName)));
   syncHiddenCursor();
   const showOpening = renderOpeningOverlay(showError);
@@ -3023,6 +3030,14 @@ textOpacityPlus.addEventListener("click", event => {
 subtitleStyleReset.addEventListener("click", event => {
   event.stopPropagation();
   send("subtitleStyleReset", 0);
+});
+
+panelCloseButtons.forEach(button => {
+  button.addEventListener("click", event => {
+    event.stopPropagation();
+    closePlayerModal(true);
+    focusShortcutRoot();
+  });
 });
 
 sourceReloadButton.addEventListener("click", event => {
