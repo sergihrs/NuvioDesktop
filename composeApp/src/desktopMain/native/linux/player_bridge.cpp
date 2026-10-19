@@ -1117,6 +1117,9 @@ std::string buildTracksJson(mpv_handle *mpv, const char *wantedType) {
         }
         bool selected = mpvGetFlag(mpv, (pfx + "/selected").c_str());
         bool forced = mpvGetFlag(mpv, (pfx + "/forced").c_str());
+        // Addon subtitles added with sub-add are external tracks; Kotlin keeps them out of the
+        // built-in list, the controls page still sees them for the subtitle toggle.
+        bool external = mpvGetFlag(mpv, (pfx + "/external").c_str());
 
         std::string base = !title.empty() ? title
                          : (!lang.empty() ? lang
@@ -1140,6 +1143,7 @@ std::string buildTracksJson(mpv_handle *mpv, const char *wantedType) {
              + ",\"language\":\"" + jsonEscape(lang) + "\""
              + ",\"selected\":" + (selected ? "true" : "false")
              + ",\"forced\":" + (forced ? "true" : "false")
+             + ",\"external\":" + (external ? "true" : "false")
              + "}";
         logicalIndex++;
     }

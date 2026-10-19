@@ -330,6 +330,7 @@ internal fun PlayerScreenRuntime.RenderPlayerRuntimeUi() {
         forcedLabel = stringResource(Res.string.settings_playback_option_forced),
         noneLabel = stringResource(Res.string.compose_player_none),
         fetchSubtitlesLabel = stringResource(Res.string.compose_player_fetch_subtitles),
+        subtitleExactMatchLabel = stringResource(Res.string.compose_player_subtitle_exact_match),
         subtitleDelayLabel = stringResource(Res.string.compose_player_subtitle_delay),
         resetLabel = stringResource(Res.string.compose_player_reset),
         autoSyncLabel = stringResource(Res.string.compose_player_auto_sync),
@@ -1545,6 +1546,7 @@ private fun PlayerScreenRuntime.buildPlayerControlSubtitleSelection(): PlayerCon
                             it.isNotBlank() && it != title
                         }.orEmpty(),
                         isSelected = option.id == selectedOptionId,
+                        isVideoHashMatch = option.subtitle.isVideoHashMatch,
                     )
                 }
             }

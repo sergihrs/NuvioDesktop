@@ -150,6 +150,7 @@ data class PlayerControlsState(
     val forcedLabel: String = "Forced",
     val noneLabel: String = "None",
     val fetchSubtitlesLabel: String = "Tap to fetch subtitles",
+    val subtitleExactMatchLabel: String = "Exact match",
     val subtitleDelayLabel: String = "Subtitle Delay",
     val resetLabel: String = "Reset",
     val autoSyncLabel: String = "Auto Sync",
@@ -342,6 +343,8 @@ data class PlayerControlSubtitleOptionItem(
     val title: String = "",
     val metadata: String = "",
     val isSelected: Boolean = false,
+    /** An addon subtitle the addon matched by the playing file's hash. */
+    val isVideoHashMatch: Boolean = false,
 )
 
 data class PlayerControlSubtitleCueItem(

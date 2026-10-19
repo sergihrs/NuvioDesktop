@@ -2191,6 +2191,7 @@ private:
             long long channelCount = int64Property((prefix + "/demux-channel-count").c_str(), 0);
             bool selected = flagProperty((prefix + "/selected").c_str(), false);
             bool forced = flagProperty((prefix + "/forced").c_str(), false);
+            bool external = flagProperty((prefix + "/external").c_str(), false);
             std::string label = formatTrackTitle(type, logicalIndex, title, language, codec, decoderDescription, channels, (int)channelCount);
 
             if (!first) json << ",";
@@ -2201,7 +2202,8 @@ private:
                  << "\"label\":\"" << jsonEscape(label) << "\","
                  << "\"language\":\"" << jsonEscape(language) << "\","
                  << "\"selected\":" << (selected ? "true" : "false") << ","
-                 << "\"forced\":" << (forced ? "true" : "false")
+                 << "\"forced\":" << (forced ? "true" : "false") << ","
+                 << "\"external\":" << (external ? "true" : "false")
                  << "}";
             logicalIndex++;
         }

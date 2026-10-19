@@ -140,6 +140,8 @@ internal expect object PlayerSettingsStorage {
     fun saveStreamAutoPlayPreferBingeGroup(enabled: Boolean)
     fun loadStreamAutoPlayReuseBingeGroup(): Boolean?
     fun saveStreamAutoPlayReuseBingeGroup(enabled: Boolean)
+    fun loadKeepSubtitlesAcrossEpisodes(): Boolean?
+    fun saveKeepSubtitlesAcrossEpisodes(enabled: Boolean)
     fun loadNextEpisodeThresholdMode(): String?
     fun saveNextEpisodeThresholdMode(mode: String)
     fun loadNextEpisodeThresholdPercent(): Float?

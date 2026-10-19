@@ -621,6 +621,15 @@ private fun PlaybackSettingsSection(
                         )
                     },
                 )
+                SettingsGroupDivider(isTablet = isTablet)
+                SettingsSwitchRow(
+                    title = stringResource(Res.string.settings_playback_keep_subtitles_across_episodes),
+                    description = stringResource(Res.string.settings_playback_keep_subtitles_across_episodes_description),
+                    checked = autoPlayPlayerSettings.keepSubtitlesAcrossEpisodes,
+                    enabled = otherSubtitleOptionsEnabled,
+                    isTablet = isTablet,
+                    onCheckedChange = PlayerSettingsRepository::setKeepSubtitlesAcrossEpisodes,
+                )
             }
         }
 

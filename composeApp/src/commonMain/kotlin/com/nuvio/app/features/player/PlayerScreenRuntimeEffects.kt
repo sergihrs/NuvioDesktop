@@ -196,8 +196,11 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
     }
 
     LaunchedEffect(playbackSession.videoId) {
-        subtitleDelayMs = PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId) ?: 0
         subtitleAutoSyncState = SubtitleAutoSyncUiState()
+    }
+
+    LaunchedEffect(playbackSession.videoId, currentStreamBingeGroup) {
+        subtitleDelayMs = loadStartingSubtitleDelayMs()
     }
 
     LaunchedEffect(playerController, subtitleDelayMs) {

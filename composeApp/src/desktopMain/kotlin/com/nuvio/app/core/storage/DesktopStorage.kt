@@ -27,9 +27,12 @@ internal object DesktopStorage {
     }
 
     fun wipe() {
+        // Keep the stores registered: objects hold on to the Store they got from store(), so
+        // dropping them here would leave those instances out of every later wipe (their stale
+        // values would survive and be written back) and give later store() callers a second
+        // instance for the same file.
         synchronized(stores) {
             stores.values.forEach(Store::clearInMemory)
-            stores.clear()
         }
         if (!rootDir.exists()) return
         Files.walk(rootDir).use { stream ->

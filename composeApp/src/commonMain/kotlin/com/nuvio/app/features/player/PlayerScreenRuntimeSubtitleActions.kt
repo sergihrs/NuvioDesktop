@@ -85,7 +85,28 @@ internal fun PlayerScreenRuntime.setSubtitleDelay(delayMs: Int) {
     val clamped = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
     subtitleDelayMs = clamped
     PlayerTrackPreferenceStorage.saveSubtitleDelayMs(playbackSession.videoId, clamped)
+    rememberReleaseSubtitleDelay(clamped)
     playerController?.setSubtitleDelayMs(clamped)
+}
+
+/** Sets the delay the item starts with, without saving it as the episode's or the release's delay. */
+internal fun PlayerScreenRuntime.applyStartingSubtitleDelayMs(delayMs: Int) {
+    val clamped = delayMs.coerceIn(SUBTITLE_DELAY_MIN_MS, SUBTITLE_DELAY_MAX_MS)
+    if (subtitleDelayMs == clamped) return
+    subtitleDelayMs = clamped
+    playerController?.setSubtitleDelayMs(clamped)
+}
+
+internal fun PlayerScreenRuntime.loadStartingSubtitleDelayMs(): Int {
+    val remembered = rememberedReleaseSubtitleChoice()
+    return resolveStartingSubtitleDelayMs(
+        episodeDelayMs = PlayerTrackPreferenceStorage.loadSubtitleDelayMs(playbackSession.videoId),
+        rememberedDelayMs = remembered?.delayMs?.takeUnless {
+            // The remembered delay was set for a subtitle not timed for this file; a hash-matched
+            // one restored in its place is, so it starts at 0.
+            !remembered.isVideoHashMatch && selectedAddonSubtitle?.isVideoHashMatch == true
+        },
+    )
 }
 
 internal fun PlayerScreenRuntime.loadSubtitleAutoSyncCues(force: Boolean = false) {

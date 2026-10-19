@@ -2717,6 +2717,24 @@ button:disabled {
   white-space: nowrap;
 }
 
+.subtitle-option-chips {
+  display: flex;
+  min-width: 0;
+  max-width: 100%;
+  gap: 6px;
+}
+
+.subtitle-option-chips .subtitle-source-chip {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.subtitle-exact-match-chip {
+  flex-shrink: 0 !important;
+  border: 1px solid var(--theme-border-default);
+  background: transparent;
+}
+
 .subtitle-option-row.selected .subtitle-source-chip {
   border: 1px solid rgba(255, 255, 255, .22);
   background: rgba(255, 255, 255, .14);

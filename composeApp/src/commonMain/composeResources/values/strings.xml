@@ -431,6 +431,7 @@
     <string name="compose_player_auto_sync">Auto Sync</string>
     <string name="compose_player_bold">Bold</string>
     <string name="compose_player_built_in">Built-in</string>
+    <string name="compose_player_subtitle_exact_match">Exact match</string>
     <string name="compose_player_bottom_offset">Bottom Offset</string>
     <string name="compose_player_capture_line">Capture</string>
     <string name="compose_player_close">Close player</string>
@@ -1235,6 +1236,8 @@
     <string name="settings_playback_subtitle_outline_description">Draw a border around subtitle text.</string>
     <string name="settings_playback_subtitle_show_preferred_only">Show Only Preferred Languages</string>
     <string name="settings_playback_subtitle_show_preferred_only_description">Only show subtitles matching your preferred subtitle languages.</string>
+    <string name="settings_playback_keep_subtitles_across_episodes">Keep Subtitles Across Episodes</string>
+    <string name="settings_playback_keep_subtitles_across_episodes_description">Remember the subtitle and delay you pick for each release (binge group) of a series, and use them on its other episodes.</string>
     <string name="settings_playback_subtitle_size">Subtitle Size</string>
     <string name="settings_playback_subtitle_strip_sdh">Strip SDH Subtitles</string>
     <string name="settings_playback_subtitle_strip_sdh_description">Hide sound descriptions and speaker labels from text subtitles.</string>

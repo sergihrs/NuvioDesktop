@@ -124,6 +124,24 @@ class PlayerTrackSelectionTest {
     }
 
     @Test
+    fun normalSelectionSkipsSignsAndCommentaryTracks() {
+        val tracks = listOf(
+            subtitleTrack(index = 0, language = "en", label = "English Signs/Songs (ass)", isForced = false),
+            subtitleTrack(index = 1, language = "en", label = "Commentary", isForced = false),
+            subtitleTrack(index = 2, language = "en", label = "en (subrip)", isForced = false),
+        )
+
+        assertEquals(
+            2,
+            findPreferredSubtitleTrackIndex(tracks, listOf("en"), SubtitleAutoSelectionMode.NORMAL_ONLY),
+        )
+        assertEquals(
+            -1,
+            findPreferredSubtitleTrackIndex(tracks.take(2), listOf("en"), SubtitleAutoSelectionMode.NORMAL_ONLY),
+        )
+    }
+
+    @Test
     fun forcedToggleOffRejectsForcedOnlyTrackList() {
         val selectedIndex = findPreferredSubtitleTrackIndex(
             tracks = listOf(subtitleTrack(index = 0, language = "en", isForced = true)),

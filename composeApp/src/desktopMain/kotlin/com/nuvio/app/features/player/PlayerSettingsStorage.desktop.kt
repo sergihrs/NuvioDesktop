@@ -87,6 +87,7 @@ internal actual object PlayerSettingsStorage {
     private const val streamAutoPlayNextEpisodeFallbackEnabledKey = "stream_auto_play_next_episode_fallback_enabled"
     private const val streamAutoPlayPreferBingeGroupKey = "stream_auto_play_prefer_binge_group"
     private const val streamAutoPlayReuseBingeGroupKey = "stream_auto_play_reuse_binge_group"
+    private const val keepSubtitlesAcrossEpisodesKey = "keep_subtitles_across_episodes"
     private const val nextEpisodeThresholdModeKey = "next_episode_threshold_mode"
     private const val nextEpisodeThresholdPercentKey = "next_episode_threshold_percent_v2"
     private const val nextEpisodeThresholdMinutesBeforeEndKey = "next_episode_threshold_minutes_before_end_v2"
@@ -175,6 +176,7 @@ internal actual object PlayerSettingsStorage {
         streamAutoPlayNextEpisodeFallbackEnabledKey,
         streamAutoPlayPreferBingeGroupKey,
         streamAutoPlayReuseBingeGroupKey,
+        keepSubtitlesAcrossEpisodesKey,
         nextEpisodeThresholdModeKey,
         nextEpisodeThresholdPercentKey,
         nextEpisodeThresholdMinutesBeforeEndKey,
@@ -342,6 +344,8 @@ internal actual object PlayerSettingsStorage {
     actual fun saveStreamAutoPlayPreferBingeGroup(enabled: Boolean) = saveBoolean(streamAutoPlayPreferBingeGroupKey, enabled)
     actual fun loadStreamAutoPlayReuseBingeGroup(): Boolean? = loadBoolean(streamAutoPlayReuseBingeGroupKey)
     actual fun saveStreamAutoPlayReuseBingeGroup(enabled: Boolean) = saveBoolean(streamAutoPlayReuseBingeGroupKey, enabled)
+    actual fun loadKeepSubtitlesAcrossEpisodes(): Boolean? = loadBoolean(keepSubtitlesAcrossEpisodesKey)
+    actual fun saveKeepSubtitlesAcrossEpisodes(enabled: Boolean) = saveBoolean(keepSubtitlesAcrossEpisodesKey, enabled)
     actual fun loadNextEpisodeThresholdMode(): String? = loadString(nextEpisodeThresholdModeKey)
     actual fun saveNextEpisodeThresholdMode(mode: String) = saveString(nextEpisodeThresholdModeKey, mode)
     actual fun loadNextEpisodeThresholdPercent(): Float? = loadFloat(nextEpisodeThresholdPercentKey)
@@ -458,6 +462,7 @@ internal actual object PlayerSettingsStorage {
         }
         loadStreamAutoPlayPreferBingeGroup()?.let { put(streamAutoPlayPreferBingeGroupKey, encodeSyncBoolean(it)) }
         loadStreamAutoPlayReuseBingeGroup()?.let { put(streamAutoPlayReuseBingeGroupKey, encodeSyncBoolean(it)) }
+        loadKeepSubtitlesAcrossEpisodes()?.let { put(keepSubtitlesAcrossEpisodesKey, encodeSyncBoolean(it)) }
         loadNextEpisodeThresholdMode()?.let { put(nextEpisodeThresholdModeKey, encodeSyncString(it)) }
         loadNextEpisodeThresholdPercent()?.let { put(nextEpisodeThresholdPercentKey, encodeSyncFloat(it)) }
         loadNextEpisodeThresholdMinutesBeforeEnd()?.let { put(nextEpisodeThresholdMinutesBeforeEndKey, encodeSyncFloat(it)) }
@@ -541,6 +546,7 @@ internal actual object PlayerSettingsStorage {
             ?.let(::saveStreamAutoPlayNextEpisodeFallbackEnabled)
         payload.decodeSyncBoolean(streamAutoPlayPreferBingeGroupKey)?.let(::saveStreamAutoPlayPreferBingeGroup)
         payload.decodeSyncBoolean(streamAutoPlayReuseBingeGroupKey)?.let(::saveStreamAutoPlayReuseBingeGroup)
+        payload.decodeSyncBoolean(keepSubtitlesAcrossEpisodesKey)?.let(::saveKeepSubtitlesAcrossEpisodes)
         payload.decodeSyncString(nextEpisodeThresholdModeKey)?.let(::saveNextEpisodeThresholdMode)
         payload.decodeSyncFloat(nextEpisodeThresholdPercentKey)?.let(::saveNextEpisodeThresholdPercent)
         payload.decodeSyncFloat(nextEpisodeThresholdMinutesBeforeEndKey)?.let(::saveNextEpisodeThresholdMinutesBeforeEnd)

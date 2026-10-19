@@ -1181,6 +1181,7 @@ const subtitleSelectionOptions = () => normalizeItems(state.subtitleOptionItems)
   metadata: String(item.metadata || ""),
   selected: Boolean(item.isSelected),
   index: Number(item.index) || 0,
+  exactMatch: Boolean(item.isVideoHashMatch),
 }));
 
 const subtitleLanguages = () => normalizeItems(state.subtitleLanguageItems).map(item => ({
@@ -1252,7 +1253,19 @@ const appendSubtitleOptionRow = option => {
   const source = document.createElement("span");
   source.className = "subtitle-source-chip";
   source.textContent = option.sourceLabel;
-  copy.appendChild(source);
+  if (option.exactMatch) {
+    // Synced to this exact file: the addon matched it by the video hash.
+    const chips = document.createElement("span");
+    chips.className = "subtitle-option-chips";
+    chips.appendChild(source);
+    const exactMatch = document.createElement("span");
+    exactMatch.className = "subtitle-source-chip subtitle-exact-match-chip";
+    exactMatch.textContent = state.subtitleExactMatchLabel || "Exact match";
+    chips.appendChild(exactMatch);
+    copy.appendChild(chips);
+  } else {
+    copy.appendChild(source);
+  }
   const title = document.createElement("span");
   title.className = "subtitle-option-title";
   title.textContent = option.title;
