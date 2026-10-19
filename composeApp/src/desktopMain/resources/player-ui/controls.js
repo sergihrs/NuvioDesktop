@@ -414,6 +414,11 @@ let chromeInteractionLastNotedAt = 0;
 let isChromePointerInside = false;
 let isChromePointerDown = false;
 let isChromeFocusInside = false;
+// A mouse click leaves the clicked control focused (WebKitGTK focuses buttons on press). That is not the user
+// moving focus with the keyboard, so it must not take Enter from the skip / next-episode prompt.
+// pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
+let lastInputWasPointer = false;
+let pointerFocusedElement = null;
 let hiddenCursorTimer = 0;
 let hiddenCursorTemporarilyVisible = false;
 let cursorActivityLastSentAt = 0;
@@ -2174,18 +2179,19 @@ const resetSkipPromptAutoHide = () => {
   skipPromptAutoHideActive = false;
   skipPromptAutoHidden = false;
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.width = "100%";
 };
 
 const startSkipPromptAutoHide = () => {
   if (skipPromptAutoHideActive || skipPromptAutoHidden) return;
   skipPromptAutoHideActive = true;
+  // The bar counts down the time until the button hides: full when it appears, empty when it goes.
   skipPromptProgress.style.transition = "none";
-  skipPromptProgress.style.width = "0%";
+  skipPromptProgress.style.width = "100%";
   window.requestAnimationFrame(() => {
     window.requestAnimationFrame(() => {
       skipPromptProgress.style.transition = `width ${prefersReducedMotion ? 1 : 10000}ms linear`;
-      skipPromptProgress.style.width = "100%";
+      skipPromptProgress.style.width = "0%";
     });
   });
   skipPromptAutoHideTimer = window.setTimeout(() => {
@@ -2245,6 +2251,7 @@ const renderNativePlaybackPrompts = () => {
   skipPrompt.setAttribute("aria-hidden", showSkip ? "false" : "true");
   skipPrompt.classList.toggle("visible", showSkip);
   skipPrompt.classList.toggle("show-progress", showSkipProgress);
+  skipPrompt.tabIndex = showSkip ? 0 : -1;
   syncSkipPromptPlacement(showSkip);
   if (showSkipProgress) {
     startSkipPromptAutoHide();
@@ -2264,9 +2271,36 @@ const renderNativePlaybackPrompts = () => {
   nextEpisodeAction.textContent = state.nextEpisodeActionLabel || "Play";
   nextEpisodeCard.setAttribute("aria-hidden", showNextEpisode ? "false" : "true");
   nextEpisodeCard.classList.toggle("visible", showNextEpisode);
+  nextEpisodeCard.tabIndex = showNextEpisode ? 0 : -1;
   nextEpisodeCard.classList.toggle("playable", Boolean(state.nextEpisodePlayable));
   nextEpisodeCard.classList.toggle("has-thumb", Boolean(nextThumbUrl));
   nextEpisodeCard.classList.toggle("blur-thumb", blurNextThumb);
+  syncPlaybackPromptDefault();
+};
+
+// Shown on screen right now: not auto-hidden, and not removed by a mode such as PiP (display: none).
+const isPlaybackPromptShown = element =>
+  element.classList.contains("visible") && element.getClientRects().length > 0;
+
+// A control has keyboard focus (Tab, arrows), not focus left by a click: only then does Enter belong to it.
+const hasKeyboardControlFocus = () => {
+  const activeEl = document.activeElement;
+  return Boolean(activeEl && activeEl.tagName !== "BODY" && activeEl !== root && activeEl !== pointerFocusedElement);
+};
+
+// The prompt Enter triggers: a playable next episode when its card is shown (also while the skip button for the
+// outro is, as in the TV app), otherwise the skip button.
+const playbackPromptEnterCommand = () => {
+  if (isPlaybackPromptShown(nextEpisodeCard) && state.nextEpisodePlayable) return "playNextEpisode";
+  if (isPlaybackPromptShown(skipPrompt)) return "skipInterval";
+  return "";
+};
+
+// Mark the prompt Enter will trigger. Enter does not reach it while a panel is open or a control has keyboard focus.
+const syncPlaybackPromptDefault = () => {
+  const command = !activeModal && !hasKeyboardControlFocus() ? playbackPromptEnterCommand() : "";
+  skipPrompt.classList.toggle("is-default", command === "skipInterval");
+  nextEpisodeCard.classList.toggle("is-default", command === "playNextEpisode");
 };
 
 const isOpeningOverlayActive = () =>
@@ -2480,8 +2514,10 @@ const renderChrome = () => {
   if (showError) {
     skipPrompt.classList.remove("visible", "show-progress");
     skipPrompt.setAttribute("aria-hidden", "true");
+    skipPrompt.tabIndex = -1;
     nextEpisodeCard.classList.remove("visible");
     nextEpisodeCard.setAttribute("aria-hidden", "true");
+    nextEpisodeCard.tabIndex = -1;
   } else {
     renderNativePlaybackPrompts();
   }
@@ -2753,6 +2789,10 @@ const clearPressedButton = () => {
 };
 
 document.addEventListener("pointerdown", event => {
+  lastInputWasPointer = true;
+  // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
+  pointerFocusedElement = document.activeElement;
+  syncPlaybackPromptDefault();
   if (event.button === 3) {
     showCommandToast("seekBack");
     send("seekBack", 0);
@@ -2797,6 +2837,12 @@ document.addEventListener("pointerleave", () => {
   updateChromePointerInside(false);
 }, true);
 document.addEventListener("focusin", event => {
+  if (lastInputWasPointer) {
+    pointerFocusedElement = event.target;
+  } else if (event.target !== pointerFocusedElement || event.relatedTarget) {
+    // Moved by keyboard. The same element regaining focus with the window (no relatedTarget) keeps its origin.
+    pointerFocusedElement = null;
+  }
   isChromeFocusInside = isChromeInteractionTarget(event.target);
   const actionButton = event.target.closest && event.target.closest(".action-pill .action");
   if (actionButton) {
@@ -2805,11 +2851,13 @@ document.addEventListener("focusin", event => {
   if (isChromeFocusInside) {
     noteChromeActivity(true);
   }
+  syncPlaybackPromptDefault();
 }, true);
 document.addEventListener("focusout", () => {
   window.setTimeout(() => {
     isChromeFocusInside = isChromeInteractionTarget(document.activeElement);
     noteChromeActivity(true);
+    syncPlaybackPromptDefault();
   }, 0);
 }, true);
 window.addEventListener("blur", () => {
@@ -3664,6 +3712,11 @@ document.addEventListener("keyup", event => {
   }
 });
 
+// Any key other than a lone modifier switches to keyboard input: focus it moves from now on is keyboard focus.
+document.addEventListener("keydown", event => {
+  if (!["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) lastInputWasPointer = false;
+}, true);
+
 document.addEventListener("keydown", event => {
   if (event.key === "Escape" && isPartyConfirmOpen()) {
     event.preventDefault();
@@ -3856,13 +3909,11 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (event.code === "Enter" && state.skipPromptVisible) {
-    const activeEl = document.activeElement;
-    if (!activeEl || activeEl.tagName === "BODY" || activeEl === root) {
-      event.preventDefault();
-      send("skipInterval", 0);
-      return;
-    }
+  const promptCommand = event.code === "Enter" && !hasKeyboardControlFocus() ? playbackPromptEnterCommand() : "";
+  if (promptCommand) {
+    event.preventDefault();
+    send(promptCommand, 0);
+    return;
   }
   if (event.shiftKey && event.code === "KeyN") {
     event.preventDefault();
