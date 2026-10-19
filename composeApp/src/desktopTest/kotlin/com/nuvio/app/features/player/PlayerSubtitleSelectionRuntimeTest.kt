@@ -3,6 +3,7 @@ package com.nuvio.app.features.player
 import androidx.compose.ui.Modifier
 import com.nuvio.app.core.storage.DesktopStorage
 import com.nuvio.app.features.details.MetaVideo
+import com.nuvio.app.features.plugins.PluginRepository
 import com.nuvio.app.features.streams.StreamBehaviorHints
 import com.nuvio.app.features.streams.StreamItem
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,9 @@ class PlayerSubtitleSelectionRuntimeTest {
     fun cleanup() {
         scope.cancel()
         if (storageIsIsolated()) DesktopStorage.wipe()
+        // Switching episodes pauses plugin search for playback, a process-wide flag: release it, or plugin runs in
+        // later test classes (PluginRuntimeDesktopTest) wait for it forever.
+        PluginRepository.setLocalPluginSearchPaused(false)
     }
 
     @Test
