@@ -97,6 +97,7 @@ internal class PlayerScreenRuntime(
     val torrentFileIdx: Int? get() = args.torrentFileIdx
     val torrentFilename: String? get() = args.torrentFilename
     val torrentTrackers: List<String> get() = args.torrentTrackers
+    val subtitleVideoParams: SubtitleVideoParams? get() = args.subtitleVideoParams
     val initialPositionMs: Long get() = args.initialPositionMs
     val initialProgressFraction: Float? get() = args.initialProgressFraction
     var externalSubtitles by mutableStateOf(args.externalSubtitles)
@@ -150,6 +151,7 @@ internal class PlayerScreenRuntime(
     var activeSourceFilename by mutableStateOf(args.sourceFilename ?: torrentFilename)
     var activeTorrentTrackers by mutableStateOf(torrentTrackers)
     var p2pResolvedSourceUrl by mutableStateOf<String?>(null)
+    var activeSubtitleVideoParams by mutableStateOf(subtitleVideoParams)
     var activeSourceIdentityKey by mutableStateOf(
         torrentInfoHash?.trim()?.lowercase()?.takeIf { it.isNotBlank() }?.let { hash ->
             "torrent:$hash:${torrentFileIdx ?: -1}"

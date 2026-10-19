@@ -30,15 +30,24 @@ object SubtitleRepository {
 
     private var activeFetchJob: Job? = null
 
-    fun fetchAddonSubtitles(type: String, videoId: String) {
+    /** The video params sent with the last fetch, so callers can tell when a refetch would differ. */
+    var lastRequestedVideoParams: SubtitleVideoParams? = null
+        private set
+
+    fun fetchAddonSubtitles(
+        type: String,
+        videoId: String,
+        videoParams: SubtitleVideoParams? = null,
+    ) {
         activeFetchJob?.cancel()
         _loadingProgress.value = null
+        lastRequestedVideoParams = videoParams
         activeFetchJob = scope.launch {
             _isLoading.value = true
             _error.value = null
             _addonSubtitles.value = emptyList()
 
-            val requests = addonSubtitleRequests(type, videoId)
+            val requests = addonSubtitleRequests(type, videoId, videoParams)
             if (requests.isEmpty()) {
                 _isLoading.value = false
                 return@launch
@@ -59,8 +68,36 @@ object SubtitleRepository {
         }
     }
 
+    /**
+     * Refetches with better [videoParams] (typically once the video hash is known) without
+     * clearing the current list: the new results replace it in one step, and a failed refetch
+     * keeps the old list. Falls back to a normal fetch while a fetch is still running.
+     */
+    fun refreshAddonSubtitles(
+        type: String,
+        videoId: String,
+        videoParams: SubtitleVideoParams,
+    ) {
+        if (_isLoading.value || _addonSubtitles.value.isEmpty()) {
+            fetchAddonSubtitles(type, videoId, videoParams)
+            return
+        }
+        activeFetchJob?.cancel()
+        lastRequestedVideoParams = videoParams
+        activeFetchJob = scope.launch {
+            val requests = addonSubtitleRequests(type, videoId, videoParams)
+            if (requests.isEmpty()) return@launch
+            val subtitles = loadAddonSubtitles(requests)
+            if (subtitles.isNotEmpty()) {
+                _error.value = null
+                _addonSubtitles.value = subtitles
+            }
+        }
+    }
+
     fun clear() {
         activeFetchJob?.cancel()
+        lastRequestedVideoParams = null
         _loadingProgress.value = null
         _addonSubtitles.value = emptyList()
         _isLoading.value = false

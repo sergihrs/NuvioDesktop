@@ -16,6 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -31,9 +32,14 @@ data class SubtitleAddonRequest(
     val addonName: String,
 )
 
-internal fun addonSubtitleRequests(type: String, videoId: String): List<SubtitleAddonRequest> {
+internal fun addonSubtitleRequests(
+    type: String,
+    videoId: String,
+    videoParams: SubtitleVideoParams? = null,
+): List<SubtitleAddonRequest> {
     if (ServerItemRef.isServerId(videoId)) return emptyList()
     val requestType = canonicalSubtitleType(type)
+    val extraPathSegment = buildSubtitleExtraPathSegment(videoParams)
     return AddonRepository.uiState.value.addons.enabledAddons().mapNotNull { addon ->
         val manifest = addon.manifest ?: return@mapNotNull null
         if (manifest.resources.none { resource ->
@@ -41,7 +47,13 @@ internal fun addonSubtitleRequests(type: String, videoId: String): List<Subtitle
                     resource.supportsSubtitleType(requestType, videoId)
             }) return@mapNotNull null
         SubtitleAddonRequest(
-            url = buildAddonResourceUrl(manifest.transportUrl, "subtitles", requestType, videoId),
+            url = buildAddonResourceUrl(
+                manifestUrl = manifest.transportUrl,
+                resource = "subtitles",
+                type = requestType,
+                id = videoId,
+                extraPathSegment = extraPathSegment,
+            ),
             addonId = manifest.id,
             addonName = addon.displayTitle,
         )
@@ -86,9 +98,19 @@ private suspend fun parseAddonSubtitles(response: String, request: SubtitleAddon
                 request.addonName,
             ),
             addonName = request.addonName,
+            isVideoHashMatch = (obj[SubtitleMatchedByField] as? JsonPrimitive)?.contentOrNull ==
+                SubtitleMatchedByVideoHash,
         )
     }
 }
+
+/**
+ * The OpenSubtitles v3 addon tags every result with how it was matched (`"m": "i"` for the IMDb id,
+ * `"m": "h"` for the `videoHash` extra) and lists hash matches first. A hash match was timed for
+ * this exact file, so it needs no subtitle delay.
+ */
+private const val SubtitleMatchedByField = "m"
+private const val SubtitleMatchedByVideoHash = "h"
 
 private fun canonicalSubtitleType(type: String): String =
     if (type.equals("tv", ignoreCase = true)) "series" else type.lowercase()

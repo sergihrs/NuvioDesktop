@@ -218,6 +218,7 @@ internal fun PlayerScreenRuntime.switchToP2pSourceStream(stream: StreamItem) {
     activeSourceHeaders = emptyMap()
     activeSourceResponseHeaders = emptyMap()
     activeStreamType = null
+    activeSubtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams()
     activeTorrentInfoHash = infoHash
     activeTorrentFileIdx = stream.p2pFileIdx
     activeTorrentFilename = stream.behaviorHints.filename
@@ -267,6 +268,7 @@ internal fun PlayerScreenRuntime.switchToP2pEpisodeStream(
     activeSourceHeaders = emptyMap()
     activeSourceResponseHeaders = emptyMap()
     activeStreamType = null
+    activeSubtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams()
     activeTorrentInfoHash = infoHash
     activeTorrentFileIdx = stream.p2pFileIdx
     activeTorrentFilename = stream.behaviorHints.filename
@@ -325,6 +327,7 @@ internal fun PlayerScreenRuntime.switchToSource(
     activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     activeStreamType = stream.streamType
+    activeSubtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams()
     activeSourceIdentityKey = sourceIdentityKey
     activeSourceFilename = stream.behaviorHints.filename
     activeStreamTitle = stream.streamLabel
@@ -391,6 +394,7 @@ internal fun PlayerScreenRuntime.switchToEpisodeStream(
     activeSourceHeaders = sanitizePlaybackHeaders(stream.behaviorHints.proxyHeaders?.request)
     activeSourceResponseHeaders = sanitizePlaybackResponseHeaders(stream.behaviorHints.proxyHeaders?.response)
     activeStreamType = stream.streamType
+    activeSubtitleVideoParams = stream.behaviorHints.toSubtitleVideoParams()
     applyEpisodeStreamMetadata(stream, episode, resume)
 }
 
@@ -425,6 +429,7 @@ internal fun PlayerScreenRuntime.switchToDownloadedEpisode(downloadItem: Downloa
     activeSourceHeaders = emptyMap()
     activeSourceResponseHeaders = emptyMap()
     activeStreamType = null
+    activeSubtitleVideoParams = null
     activeSourceIdentityKey = null
     activeSourceFilename = null
     activeStreamTitle = downloadItem.streamTitle.ifBlank {
