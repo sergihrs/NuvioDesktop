@@ -3854,7 +3854,9 @@ document.addEventListener("keydown", event => {
     return;
   }
 
-  if (activeModal && event.code.startsWith("Arrow") && (!document.activeElement || document.activeElement.tagName === "BODY" || document.activeElement === root)) {
+  // Focus a click left outside the panel (the bar button that opened it) counts as none: the arrows enter the panel.
+  // Arrow moves are keyboard moves, so they show the focus ring (WebKit hides it on script focus after a click).
+  if (activeModal && event.code.startsWith("Arrow") && !hasKeyboardControlFocus() && !modalByName[activeModal].contains(document.activeElement)) {
     let items;
     if (activeModal === "subtitles") {
       items = Array.from(document.querySelectorAll('.subtitle-language-row:not([disabled]):not([hidden])'))
@@ -3873,7 +3875,7 @@ document.addEventListener("keydown", event => {
         nextIndex = selectedIndex > 0 ? selectedIndex - 1 : items.length - 1;
       }
       event.preventDefault();
-      items[nextIndex].focus();
+      items[nextIndex].focus({ focusVisible: true });
       return;
     }
   }
@@ -3889,13 +3891,13 @@ document.addEventListener("keydown", event => {
         if (event.code === 'ArrowRight' || event.code === 'ArrowDown') {
           event.preventDefault();
           const next = (currentIndex + 1) % focusable.length;
-          focusable[next].focus();
+          focusable[next].focus({ focusVisible: true });
           return;
         }
         if (event.code === 'ArrowLeft' || event.code === 'ArrowUp') {
           event.preventDefault();
           const next = currentIndex > 0 ? currentIndex - 1 : focusable.length - 1;
-          focusable[next].focus();
+          focusable[next].focus({ focusVisible: true });
           return;
         }
       }
