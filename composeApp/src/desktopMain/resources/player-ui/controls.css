@@ -2538,37 +2538,50 @@ button:disabled {
 }
 
 
-/* The bar gets its own 12px gutter, kept even when the list fits, so it never covers the rows.
-   No scrollbar-width/scrollbar-color: with either set, WebKit and Chromium ignore the
-   ::-webkit-scrollbar rules and WebKitGTK/macOS draw an overlay bar over the content. */
+/* Panel lists (and the watch party's Party tab, see party.css) draw a thin bar in their own 14px gutter, so it never
+   covers the rows: a faint 4px thumb centred in it, 6px while hovered or dragged. No scrollbar-width/scrollbar-color:
+   with either set, WebKit and Chromium ignore the ::-webkit-scrollbar rules and WebKitGTK/macOS draw an overlay bar
+   over the content. The Audio and Subtitles lists keep the gutter when they fit, so rows don't change width once a
+   list scrolls. */
+.track-list,
+.style-panel {
+  overflow-x: hidden;
+}
+
 .audio-rail-panel .track-list,
 .subtitle-rail-panel .track-list,
 .subtitle-rail-panel .style-panel {
   overflow-y: scroll;
 }
 
-.audio-rail-panel .track-list::-webkit-scrollbar,
-.subtitle-rail-panel .track-list::-webkit-scrollbar,
-.subtitle-rail-panel .style-panel::-webkit-scrollbar {
-  width: 12px;
+.track-list::-webkit-scrollbar,
+.style-panel::-webkit-scrollbar,
+.party-body::-webkit-scrollbar {
+  width: 14px;
 }
 
-.audio-rail-panel .track-list::-webkit-scrollbar-thumb,
-.subtitle-rail-panel .track-list::-webkit-scrollbar-thumb,
-.subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb {
-  border: 3px solid transparent;
+.track-list::-webkit-scrollbar-thumb,
+.style-panel::-webkit-scrollbar-thumb,
+.party-body::-webkit-scrollbar-thumb {
+  border: 5px solid transparent;
   border-radius: 999px;
-  background: rgba(255, 255, 255, .3) padding-box;
+  background: rgba(255, 255, 255, .16) padding-box;
 }
 
-.audio-rail-panel .track-list::-webkit-scrollbar-thumb:hover,
-.subtitle-rail-panel .track-list::-webkit-scrollbar-thumb:hover,
-.subtitle-rail-panel .style-panel::-webkit-scrollbar-thumb:hover {
-  border-width: 2px;
+.track-list::-webkit-scrollbar-thumb:hover,
+.track-list::-webkit-scrollbar-thumb:active,
+.style-panel::-webkit-scrollbar-thumb:hover,
+.style-panel::-webkit-scrollbar-thumb:active,
+.party-body::-webkit-scrollbar-thumb:hover,
+.party-body::-webkit-scrollbar-thumb:active {
+  border-width: 4px;
+  background-color: rgba(255, 255, 255, .32);
 }
 
 .player-side-panel .track-list {
   margin-top: 16px;
+  /* The scrollbar gutter takes its width from the panel's padding, so the cards keep their width. */
+  margin-right: -14px;
   gap: 8px;
   padding: 14px 8px 8px;
 }
