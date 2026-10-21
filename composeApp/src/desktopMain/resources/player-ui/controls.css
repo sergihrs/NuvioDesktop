@@ -2207,12 +2207,20 @@ button:disabled {
   white-space: nowrap;
 }
 
-.panel-button:hover:not(:disabled),
-.filter-chip:hover:not(:disabled),
-.capture-button:hover:not(:disabled),
-.subtitle-tab:hover:not(:disabled),
-.round-step:hover:not(:disabled),
-.segment-button:hover:not(:disabled) {
+/* Panel controls show one "current" highlight for the input used last (controls.js): the hover look while the
+   pointer is in use, the same look on the focused control while the keyboard is. The :where() keeps specificity. */
+:where(.player:not(.keyboard-navigation)) .panel-button:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .filter-chip:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .capture-button:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .subtitle-tab:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .round-step:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .segment-button:hover:not(:disabled),
+:where(.keyboard-navigation) .panel-button:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .filter-chip:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .capture-button:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .subtitle-tab:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .round-step:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .segment-button:focus-visible:not(:disabled) {
   background: rgba(255, 255, 255, .13);
   color: rgba(255, 255, 255, .9);
 }
@@ -2243,8 +2251,10 @@ button:disabled {
   border-color: rgba(255, 255, 255, .18);
 }
 
-.panel-button.primary:hover:not(:disabled),
-.segment-button.selected:hover:not(:disabled) {
+:where(.player:not(.keyboard-navigation)) .panel-button.primary:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .segment-button.selected:hover:not(:disabled),
+:where(.keyboard-navigation) .panel-button.primary:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .segment-button.selected:focus-visible:not(:disabled) {
   background: var(--theme-accent-strong);
 }
 
@@ -2678,7 +2688,8 @@ button:disabled {
   opacity: .45;
 }
 
-.track-row:hover:not(:disabled) {
+:where(.player:not(.keyboard-navigation)) .track-row:hover:not(:disabled),
+:where(.keyboard-navigation) .track-row:focus-visible:not(:disabled) {
   background: rgba(255, 255, 255, .08);
 }
 
@@ -2693,7 +2704,8 @@ button:disabled {
   font-weight: 700;
 }
 
-.track-row.selected:hover:not(:disabled) {
+:where(.player:not(.keyboard-navigation)) .track-row.selected:hover:not(:disabled),
+:where(.keyboard-navigation) .track-row.selected:focus-visible:not(:disabled) {
   background: var(--theme-accent-strong);
 }
 
@@ -2703,7 +2715,8 @@ button:disabled {
   color: var(--theme-text-primary);
 }
 
-.track-row.source-row.selected:hover:not(:disabled) {
+:where(.player:not(.keyboard-navigation)) .track-row.source-row.selected:hover:not(:disabled),
+:where(.keyboard-navigation) .track-row.source-row.selected:focus-visible:not(:disabled) {
   background: color-mix(in srgb, var(--theme-accent) 18%, transparent);
 }
 
@@ -3090,8 +3103,10 @@ button:disabled {
   color: var(--theme-text-primary);
 }
 
-.track-row.episode-row:hover:not(:disabled),
-.track-row.episode-row.selected:hover:not(:disabled) {
+:where(.player:not(.keyboard-navigation)) .track-row.episode-row:hover:not(:disabled),
+:where(.player:not(.keyboard-navigation)) .track-row.episode-row.selected:hover:not(:disabled),
+:where(.keyboard-navigation) .track-row.episode-row:focus-visible:not(:disabled),
+:where(.keyboard-navigation) .track-row.episode-row.selected:focus-visible:not(:disabled) {
   background: rgba(255, 255, 255, .12);
 }
 
@@ -3138,6 +3153,21 @@ button:focus-visible,
 }
 
 button.action:focus-visible {
+  outline: none;
+}
+
+/* In the panels, the keyboard's current control has the hover look (see above) plus a thin ring drawn inside it,
+   which a scrolling list can't cut off. Once the pointer takes over, that focus isn't shown at all. */
+:where(.keyboard-navigation) .modal-layer :is(.track-row, .panel-button, .filter-chip, .capture-button, .subtitle-tab, .round-step, .segment-button):focus-visible {
+  outline: 1px solid color-mix(in srgb, var(--theme-focus) 60%, transparent);
+  outline-offset: -1px;
+}
+
+:where(.keyboard-navigation) .modal-layer :is(.track-row.selected:not(.source-row, .episode-row), .panel-button.primary, .segment-button.selected):focus-visible {
+  outline-color: color-mix(in srgb, var(--theme-on-accent) 50%, transparent);
+}
+
+:where(.player:not(.keyboard-navigation)) .modal-layer button:focus-visible {
   outline: none;
 }
 

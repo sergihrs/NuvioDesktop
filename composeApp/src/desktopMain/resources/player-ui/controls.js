@@ -421,6 +421,11 @@ let isChromeFocusInside = false;
 // pointerFocusedElement: the element focused by a pointer press (or already focused when one happened).
 let lastInputWasPointer = false;
 let pointerFocusedElement = null;
+// The panels highlight one "current" control, for the input used last: the hovered one while the pointer is in use,
+// the focused one while the keyboard is (.keyboard-navigation on the root, see controls.css). A still pointer left a
+// second highlight on the row under it otherwise, which blinked when a keyboard pick rebuilt the list.
+let lastPointerScreenX = null;
+let lastPointerScreenY = null;
 let hiddenCursorTimer = 0;
 let hiddenCursorTemporarilyVisible = false;
 let cursorActivityLastSentAt = 0;
@@ -2814,6 +2819,7 @@ const clearPressedButton = () => {
 
 document.addEventListener("pointerdown", event => {
   lastInputWasPointer = true;
+  root.classList.remove("keyboard-navigation");
   // Focus that stays put on a press (the control was focused already) now counts as pointer focus too.
   pointerFocusedElement = document.activeElement;
   syncPlaybackPromptDefault();
@@ -2846,6 +2852,16 @@ document.addEventListener("pointerdown", event => {
 }, true);
 
 document.addEventListener("pointermove", event => {
+  // Only real movement hands over: WebKitGTK also turns window crossings into moves at the same spot.
+  if (event.screenX !== lastPointerScreenX || event.screenY !== lastPointerScreenY) {
+    lastPointerScreenX = event.screenX;
+    lastPointerScreenY = event.screenY;
+    if (root.classList.contains("keyboard-navigation")) {
+      root.classList.remove("keyboard-navigation");
+      // The keyboard focus is no longer shown, so Space/Enter must not press it.
+      pointerFocusedElement = document.activeElement;
+    }
+  }
   noteCursorActivity();
   const inside = isChromeInteractionTarget(event.target);
   updateChromePointerInside(inside);
@@ -3753,7 +3769,9 @@ document.addEventListener("keyup", event => {
 
 // Any key other than a lone modifier switches to keyboard input: focus it moves from now on is keyboard focus.
 document.addEventListener("keydown", event => {
-  if (!["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) lastInputWasPointer = false;
+  if (["Alt", "Control", "Meta", "Shift", "AltGraph"].includes(event.key)) return;
+  lastInputWasPointer = false;
+  root.classList.add("keyboard-navigation");
 }, true);
 
 document.addEventListener("keydown", event => {
