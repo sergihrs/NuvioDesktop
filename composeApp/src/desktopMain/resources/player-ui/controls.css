@@ -2011,23 +2011,25 @@ button:disabled {
 }
 
 .player-side-modal {
+  /* The side panels float as a card like the Subtitles/Audio/Speed panels, clear of the window edges. */
+  --side-panel-gap: clamp(12px, 1.5vw, 24px);
   display: flex;
   align-items: stretch;
   justify-content: flex-end;
-  padding: 0;
+  padding: var(--side-panel-gap);
   background: rgba(0, 0, 0, .34);
 }
 
 .player-side-modal .player-side-panel {
-  width: min(520px, calc(100vw - 24px));
+  width: min(520px, calc(100vw - 2 * var(--side-panel-gap)));
   height: 100%;
   max-height: none;
   padding: 24px;
-  border: 0;
-  border-radius: 16px 0 0 16px;
+  border-radius: 20px;
+  /* Opaque, unlike the rail card: this one covers the bottom bar. */
   background: var(--theme-surface-elevated);
-  box-shadow: -18px 0 54px rgba(0, 0, 0, .32);
-  transform: translateX(100%);
+  box-shadow: none;
+  transform: translateX(calc(100% + var(--side-panel-gap)));
 }
 
 .player-side-modal.modal-visible .player-side-panel {
@@ -2035,7 +2037,7 @@ button:disabled {
 }
 
 .player-side-modal.modal-closing .player-side-panel {
-  transform: translateX(100%);
+  transform: translateX(calc(100% + var(--side-panel-gap)));
 }
 
 .track-header {
@@ -3392,12 +3394,13 @@ button.action:focus-visible {
   }
 
   .player-side-modal {
-    padding: 0;
+    --side-panel-gap: 0px;
   }
 
   .player-side-modal .player-side-panel {
     width: 100vw;
     padding: 20px;
+    border: 0;
     border-radius: 0;
   }
 
