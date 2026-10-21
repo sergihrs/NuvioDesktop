@@ -3025,12 +3025,12 @@ button.action:focus-visible {
 }
 
 /* A filled (selected) control keeps its fill when focused: a darker or lighter fill would read as "not selected".
-   Its ring takes the control's text color, a little inside the edge, so it shows on any theme's fill. */
+   Its ring goes outside it instead, past a small gap, in the room the lists keep at their edges. */
 :where(.keyboard-navigation) .modal-layer :is(.track-row.selected:not(.source-row, .episode-row), .panel-button.primary, .segment-button.selected, .filter-chip.selected):focus-visible:not(:disabled) {
   background: var(--theme-accent);
   color: var(--theme-on-accent);
-  outline: 2px solid currentColor;
-  outline-offset: -5px;
+  outline: 2px solid var(--theme-focus);
+  outline-offset: 2px;
 }
 
 :where(.player:not(.keyboard-navigation)) .modal-layer button:focus-visible {
