@@ -2571,6 +2571,75 @@ const isTextEntryTarget = target => {
   return Boolean(element && element.type !== "range");
 };
 
+const focusableControls = container =>
+  Array.from(container.querySelectorAll('button:not([disabled]):not([hidden]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'))
+    .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+
+// How far rect b lies beyond rect a in an arrow's direction; Infinity when b's centre is not past a's edge.
+const distanceToward = (a, b, code) => {
+  if (code === "ArrowUp") return b.top + b.height / 2 < a.top ? a.top - b.bottom : Infinity;
+  if (code === "ArrowDown") return b.top + b.height / 2 > a.bottom ? b.top - a.bottom : Infinity;
+  if (code === "ArrowLeft") return b.left + b.width / 2 < a.left ? a.left - b.right : Infinity;
+  return b.left + b.width / 2 > a.right ? b.left - a.right : Infinity;
+};
+const sharesRow = (a, b) => a.top < b.bottom && b.top < a.bottom;
+const centerX = rect => rect.left + rect.width / 2;
+
+// The control an arrow moves to among `controls`: Left/Right the next one in the same row, Up/Down the one most in
+// line with `from` in the nearest row above or below. Null at the edge.
+const nearestControl = (from, controls, code) => {
+  const origin = from.getBoundingClientRect();
+  const vertical = code === "ArrowUp" || code === "ArrowDown";
+  const ahead = controls
+    .map(el => {
+      const rect = el.getBoundingClientRect();
+      return { el, rect, distance: distanceToward(origin, rect, code) };
+    })
+    .filter(item => item.distance < Infinity && (vertical || sharesRow(origin, item.rect)));
+  if (!ahead.length) return null;
+  const nearest = ahead.reduce((best, item) => item.distance < best.distance ? item : best);
+  if (!vertical) return nearest.el;
+  const offset = item => Math.abs(centerX(item.rect) - centerX(origin));
+  return ahead.filter(item => sharesRow(nearest.rect, item.rect))
+    .reduce((best, item) => offset(item) < offset(best) ? item : best).el;
+};
+
+// Subtitles panel columns (Languages, Subtitles, Style), as in the TV app: entering a column lands on the control
+// focus last left it from, else on its selected row, else on its first control.
+const subtitleColumnFocus = new Map();
+let lastSubtitleColumn = null;
+
+const subtitleColumnEntry = column => {
+  const controls = focusableControls(column);
+  const remembered = subtitleColumnFocus.get(column);
+  return controls.includes(remembered) ? remembered : controls.find(el => el.matches(".track-row.selected")) || controls[0];
+};
+
+// Up/Down stay in the column, Left/Right move along a Style row and then on to the next column with controls.
+// Up from the top of a column moves to the panel header's controls, if any; Down from there returns to the column.
+const moveSubtitlePanelFocus = (from, code) => {
+  const columns = Array.from(subtitleModal.querySelectorAll(".subtitle-rail:not([hidden])"));
+  const header = focusableControls(subtitleModal).filter(el => !el.closest(".subtitle-rail"));
+  const column = from.closest(".subtitle-rail");
+  let target;
+  if (column) {
+    subtitleColumnFocus.set(column, from);
+    lastSubtitleColumn = column;
+    target = nearestControl(from, focusableControls(column), code);
+    if (!target && code === "ArrowUp") target = nearestControl(from, header, code);
+    const step = { ArrowLeft: -1, ArrowRight: 1 }[code];
+    for (let i = columns.indexOf(column) + step; !target && step && columns[i]; i += step) {
+      target = subtitleColumnEntry(columns[i]);
+    }
+  } else if (code === "ArrowDown") {
+    target = subtitleColumnEntry(columns.includes(lastSubtitleColumn) ? lastSubtitleColumn : columns[0]);
+  } else {
+    target = nearestControl(from, header, code);
+  }
+  if (target) target.focus({ focusVisible: true });
+  return Boolean(target);
+};
+
 const requestPlaybackState = (eventType, revealControls) => {
   const currentIsPlaying = pendingIsPlaying === null
     ? Boolean(state.isPlaying)
@@ -3872,17 +3941,22 @@ document.addEventListener("keydown", event => {
     return;
   }
 
+  // Entering the Subtitles panel (no focus in it, or only what a click left outside it) starts in the Languages column.
+  if (activeModal === "subtitles" && event.code.startsWith("Arrow")) {
+    const current = subtitleModal.contains(document.activeElement) ? document.activeElement : null;
+    const from = current || (!hasKeyboardControlFocus() && subtitleColumnEntry(subtitleModal.querySelector(".subtitle-rail")));
+    if (from) {
+      event.preventDefault();
+      if (!moveSubtitlePanelFocus(from, event.code) && !current) from.focus({ focusVisible: true });
+      return;
+    }
+  }
+
   // Focus a click left outside the panel (the bar button that opened it) counts as none: the arrows enter the panel.
   // Arrow moves are keyboard moves, so they show the focus ring (WebKit hides it on script focus after a click).
   if (activeModal && event.code.startsWith("Arrow") && !hasKeyboardControlFocus() && !modalByName[activeModal].contains(document.activeElement)) {
-    let items;
-    if (activeModal === "subtitles") {
-      items = Array.from(document.querySelectorAll('.subtitle-language-row:not([disabled]):not([hidden])'))
-        .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
-    } else {
-      items = Array.from(document.querySelectorAll('.track-row:not([disabled]):not([hidden])'))
-        .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
-    }
+    const items = Array.from(document.querySelectorAll('.track-row:not([disabled]):not([hidden])'))
+      .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
     if (items.length) {
       let selectedIndex = items.findIndex(el => el.classList.contains('selected'));
       if (selectedIndex === -1) selectedIndex = 0;
@@ -3901,8 +3975,7 @@ document.addEventListener("keydown", event => {
   if (activeModal && event.code.startsWith("Arrow") && document.activeElement && document.activeElement.tagName !== "BODY" && document.activeElement !== root) {
     const modalEl = isPartyConfirmOpen() ? partyConfirm : modalByName[activeModal];
     if (!modalEl) return;
-    const focusable = Array.from(modalEl.querySelectorAll('button:not([disabled]):not([hidden]), input:not([disabled]):not([hidden]), [tabindex]:not([tabindex="-1"])'))
-      .filter(el => el.offsetWidth > 0 || el.offsetHeight > 0);
+    const focusable = focusableControls(modalEl);
     if (focusable.length) {
       const currentIndex = focusable.indexOf(document.activeElement);
       if (currentIndex >= 0) {
