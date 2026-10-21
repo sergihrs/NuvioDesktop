@@ -2327,7 +2327,11 @@ button:disabled {
   min-height: 0;
   align-items: stretch;
   gap: 14px;
-  max-width: 100%;
+  /* The lists' focus-ring room (below) reaches past the columns; don't clip it. The margins keep the columns in
+     place and their full width. */
+  max-width: calc(100% + 12px);
+  margin-inline: -6px;
+  padding-inline: 6px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
@@ -2369,7 +2373,9 @@ button:disabled {
   flex-direction: column;
   overflow: auto;
   max-height: calc(100vh - clamp(152px, 22vh, 220px));
-  padding: 0 8px 8px 0;
+  /* Room for the buttons' focus ring at the top and left edges; the margins keep the content in place. */
+  margin: -6px 0 0 -6px;
+  padding: 6px 8px 8px 6px;
 }
 
 .style-card {
@@ -2529,7 +2535,9 @@ button:disabled {
 .player-rail-modal .track-list {
   max-height: calc(100vh - clamp(132px, 20vh, 188px));
   gap: 4px;
-  padding: 8px 0;
+  /* Room for the rows' focus ring at the sides; the margins keep the rows in place. */
+  margin-inline: -6px;
+  padding: 8px 6px;
 }
 
 .audio-rail-panel .track-list {
@@ -2546,6 +2554,8 @@ button:disabled {
 .track-list,
 .style-panel {
   overflow-x: hidden;
+  /* A row or button focused near the top or bottom edge scrolls in with its focus ring. */
+  scroll-padding-block: 6px;
 }
 
 .audio-rail-panel .track-list,
