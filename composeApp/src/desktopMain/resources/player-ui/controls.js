@@ -2634,8 +2634,19 @@ const subtitleColumnEntry = column => {
   return controls.includes(remembered) ? remembered : controls.find(el => el.matches(".track-row.selected")) || controls[0];
 };
 
+// The control among `controls` whose centre is closest to `from`'s.
+const closestControl = (from, controls) => {
+  const origin = from.getBoundingClientRect();
+  const distance = el => {
+    const rect = el.getBoundingClientRect();
+    return Math.hypot(centerX(rect) - centerX(origin), rect.top + rect.height / 2 - (origin.top + origin.height / 2));
+  };
+  return controls.reduce((best, el) => !best || distance(el) < distance(best) ? el : best, null);
+};
+
 // Up/Down stay in the column, Left/Right move along a Style row and then on to the next column with controls.
-// Up from the top of a column moves to the panel header's controls, if any; Down from there returns to the column.
+// Up from the top of a column moves to the panel header's controls, if any; Down from there returns to the column,
+// and Left past the header's first control goes to the column control closest to it.
 const moveSubtitlePanelFocus = (from, code) => {
   const columns = Array.from(subtitleModal.querySelectorAll(".subtitle-rail:not([hidden])"));
   const header = focusableControls(subtitleModal).filter(el => !el.closest(".subtitle-rail"));
@@ -2654,6 +2665,7 @@ const moveSubtitlePanelFocus = (from, code) => {
     target = subtitleColumnEntry(columns.includes(lastSubtitleColumn) ? lastSubtitleColumn : columns[0]);
   } else {
     target = nearestControl(from, header, code);
+    if (!target && code === "ArrowLeft") target = closestControl(from, columns.flatMap(focusableControls));
   }
   if (target) target.focus({ focusVisible: true });
   return Boolean(target);
