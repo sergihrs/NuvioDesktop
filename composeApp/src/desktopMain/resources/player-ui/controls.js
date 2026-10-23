@@ -1038,6 +1038,8 @@ const openPlayerModal = modal => {
   modalElements.forEach(modalElement => {
     setModalVisibility(modalElement, modalElement === targetModal);
   });
+  // Likewise when the panel opens (a hidden panel can't be scrolled).
+  if (modal === "subtitles") subtitleStylePanel.scrollTop = 0;
   renderChrome();
 };
 
@@ -1307,9 +1309,12 @@ const renderSubtitleSelectionRails = () => {
   }
   const styleVisible = activeSubtitleLanguageKey !== "__off__" && activeOptions.some(option =>
     option.id === pendingSubtitleOptionId || (!pendingSubtitleOptionId && option.selected));
+  const styleShown = styleVisible && subtitleStyleRail.hidden;
   subtitleStyleRail.hidden = !styleVisible;
   subtitleStyleRail.parentElement.classList.toggle("style-visible", styleVisible);
   if (styleVisible) renderSubtitleStylePanel();
+  // The Style column starts at its top whenever it appears, not where it was last scrolled to.
+  if (styleShown) subtitleStylePanel.scrollTop = 0;
 };
 
 const formatDelay = delayMs => {
