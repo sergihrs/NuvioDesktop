@@ -379,6 +379,9 @@ let selectedEpisodeSeason = null;
 let episodeStreamFilterId = "";
 let activeSubtitleLanguageKey = "";
 let pendingSubtitleOptionId = "";
+// A subtitle picked in the panel that the app's state hasn't confirmed yet. Its new track can reach the page
+// (playerUpdate) before the new selection does (playerControls); the panel must not flash back to the old one.
+let subtitlePickUnconfirmed = false;
 let pendingIsPlaying = null;
 let pendingPlaybackTimer = 0;
 let lastNativeIsPlaying = true;
@@ -1196,6 +1199,7 @@ const resetSubtitleSelectionState = () => {
     ? selectedLanguageKey
     : (selected ? selected.languageKey : "__off__");
   pendingSubtitleOptionId = String(state.selectedSubtitleOptionId || (selected ? selected.id : ""));
+  subtitlePickUnconfirmed = false;
 };
 
 const appendSubtitleLanguageRow = item => {
@@ -1207,7 +1211,10 @@ const appendSubtitleLanguageRow = item => {
     activeSubtitleLanguageKey = item.key;
     const options = subtitleSelectionOptions().filter(option => option.languageKey === item.key);
     pendingSubtitleOptionId = options.some(option => option.id === pendingSubtitleOptionId) ? pendingSubtitleOptionId : "";
-    if (item.key === "__off__") send("selectBuiltInSubtitleTrack", -1);
+    if (item.key === "__off__") {
+      subtitlePickUnconfirmed = true;
+      send("selectBuiltInSubtitleTrack", -1);
+    }
     renderSubtitleModal();
     if (event.detail === 0 && item.key !== "__off__") {
       window.requestAnimationFrame(() => {
@@ -1237,6 +1244,7 @@ const appendSubtitleOptionRow = option => {
   row.addEventListener("click", event => {
     event.stopPropagation();
     pendingSubtitleOptionId = option.id;
+    subtitlePickUnconfirmed = true;
     if (option.kind === "builtIn") send("selectBuiltInSubtitleTrack", option.index);
     else send("selectAddonSubtitle", option.index);
     renderSubtitleModal();
@@ -3208,7 +3216,7 @@ window.playerUpdate = update => {
   if (typeof volumeLevel === "number" && volumeLevel > 0) {
     preMuteVolumeLevel = volumeLevel;
   }
-  if (subtitleTracksChanged && activeModal === "subtitles") {
+  if (subtitleTracksChanged && activeModal === "subtitles" && !subtitlePickUnconfirmed) {
     const selected = selectedSubtitleOption(subtitleSelectionOptions());
     if (selected) {
       activeSubtitleLanguageKey = selected.languageKey;
@@ -3276,6 +3284,9 @@ window.playerControls = nextState => {
       (state.selectedSubtitleOptionId || "") !== previousSelectedSubtitleOptionId)
   ) {
     resetSubtitleSelectionState();
+  } else if ((state.selectedSubtitleOptionId || "") === pendingSubtitleOptionId) {
+    // Picked what was already selected: nothing to wait for.
+    subtitlePickUnconfirmed = false;
   }
   const preventModalAutoScrolling = activeModal === "sources" || activeModal === "episodes";
   render(preventModalAutoScrolling);
