@@ -3499,6 +3499,14 @@ button.action:focus-visible {
     display: none;
   }
 
+  .action-pill.icons-only .action {
+    gap: 0;
+  }
+
+  .action-pill.icons-only .action span {
+    display: none;
+  }
+
   .modal-layer {
     padding: 14px;
   }

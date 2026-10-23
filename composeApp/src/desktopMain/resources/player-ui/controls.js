@@ -853,6 +853,19 @@ const setActionButtonLabel = (command, label) => {
   button.setAttribute("title", text);
 };
 
+const actionPill = document.querySelector(".action-pill");
+
+// The narrow bar labels its buttons, but only while every label fits next to the volume and the time: a label cut
+// down to a letter or two says nothing, so the bar then shows icons only. (The wide bar always shows icons only.)
+const fitActionLabels = () => {
+  actionPill.classList.remove("icons-only");
+  const cut = Array.from(actionPill.querySelectorAll(".action span")).some(label => label.scrollWidth > label.clientWidth);
+  actionPill.classList.toggle("icons-only", cut);
+};
+const actionLabelsObserver = new ResizeObserver(fitActionLabels);
+actionLabelsObserver.observe(document.querySelector(".action-row"));
+actionLabelsObserver.observe(document.querySelector(".playback-status"));
+
 const setImageVisualState = (element, stateName) => {
   const frame = element.parentElement;
   [element, frame].filter(Boolean).forEach(target => {
@@ -2562,6 +2575,7 @@ const renderChrome = () => {
     nextEpisodeButton.setAttribute("title", nextLabel);
     if (nextEpisodeButtonLabel) nextEpisodeButtonLabel.textContent = nextLabel;
   }
+  fitActionLabels();
   syncFullscreenButtons();
   backButton.setAttribute("aria-label", state.closeLabel || "Close player");
   submitIntroButton.setAttribute("aria-label", state.submitIntroLabel || "Submit Intro");
