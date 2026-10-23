@@ -2165,11 +2165,6 @@ button:disabled {
   border-color: rgba(255, 255, 255, .18);
 }
 
-:where(.player:not(.keyboard-navigation)) .panel-button.primary:hover:not(:disabled),
-:where(.player:not(.keyboard-navigation)) .segment-button.selected:hover:not(:disabled) {
-  background: var(--theme-accent-strong);
-}
-
 .filter-chip.selected,
 .filter-chip.selected:hover:not(:disabled) {
   background: #ffffff !important;
@@ -2582,10 +2577,6 @@ button:disabled {
   background: var(--theme-accent);
   color: var(--theme-on-accent);
   font-weight: 700;
-}
-
-:where(.player:not(.keyboard-navigation)) .track-row.selected:hover:not(:disabled) {
-  background: var(--theme-accent-strong);
 }
 
 .track-row.source-row.selected {
@@ -3017,15 +3008,17 @@ button.action:focus-visible {
   outline: none;
 }
 
-/* In the panels, the keyboard's current control has the hover look (see above) plus a thin ring drawn inside it,
-   which a scrolling list can't cut off. Once the pointer takes over, that focus isn't shown at all. */
+/* In the panels, the current control (hovered, or focused while the keyboard is in use) has the fill above plus a
+   thin ring drawn inside it, which a scrolling list can't cut off. Focus isn't shown while the pointer is in use. */
+:where(.player:not(.keyboard-navigation)) .modal-layer :is(.track-row, .panel-button, .filter-chip, .capture-button, .subtitle-tab, .round-step, .segment-button):hover:not(:disabled),
 :where(.keyboard-navigation) .modal-layer :is(.track-row, .panel-button, .filter-chip, .capture-button, .subtitle-tab, .round-step, .segment-button):focus-visible {
   outline: 1px solid color-mix(in srgb, var(--theme-focus) 60%, transparent);
   outline-offset: -1px;
 }
 
-/* A filled (selected) control keeps its fill when focused: a darker or lighter fill would read as "not selected".
+/* A filled (selected) control keeps its fill when current: a darker or lighter fill would read as "not selected".
    Its ring goes outside it instead, past a small gap, in the room the lists keep at their edges. */
+:where(.player:not(.keyboard-navigation)) .modal-layer :is(.track-row.selected:not(.source-row, .episode-row), .panel-button.primary, .segment-button.selected, .filter-chip.selected):hover:not(:disabled),
 :where(.keyboard-navigation) .modal-layer :is(.track-row.selected:not(.source-row, .episode-row), .panel-button.primary, .segment-button.selected, .filter-chip.selected):focus-visible:not(:disabled) {
   background: var(--theme-accent);
   color: var(--theme-on-accent);
