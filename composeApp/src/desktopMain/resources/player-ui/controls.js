@@ -1258,6 +1258,11 @@ const appendSubtitleOptionRow = option => {
     if (option.kind === "builtIn") send("selectBuiltInSubtitleTrack", option.index);
     else send("selectAddonSubtitle", option.index);
     renderSubtitleModal();
+    if (event.detail === 0) {
+      // Picked with the keyboard: on to the close button, so Enter again closes the panel and Down goes to Style.
+      lastSubtitleColumn = subtitleStyleRail;
+      subtitleModal.querySelector(".panel-close-button").focus({ focusVisible: true });
+    }
   });
   const copy = document.createElement("span");
   copy.className = "subtitle-option-copy";
