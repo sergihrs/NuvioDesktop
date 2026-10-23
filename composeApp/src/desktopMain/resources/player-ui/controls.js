@@ -1217,6 +1217,7 @@ const appendSubtitleLanguageRow = item => {
   const row = document.createElement("button");
   row.type = "button";
   row.className = `track-row subtitle-language-row${item.key === activeSubtitleLanguageKey ? " selected" : ""}`;
+  row.dataset.focusKey = `language:${item.key}`;
   row.addEventListener("click", event => {
     event.stopPropagation();
     activeSubtitleLanguageKey = item.key;
@@ -1225,10 +1226,9 @@ const appendSubtitleLanguageRow = item => {
     if (item.key === "__off__") send("selectBuiltInSubtitleTrack", -1);
     renderSubtitleModal();
     if (event.detail === 0 && item.key !== "__off__") {
-      window.requestAnimationFrame(() => {
-        const firstOption = addonSubtitleList.querySelector('.track-row:not([disabled]):not([hidden])');
-        if (firstOption) firstOption.focus();
-      });
+      // Picked with the keyboard: go on to the language's subtitles, at the selected one, else the first.
+      const entry = subtitleColumnEntry(addonSubtitleList.closest(".subtitle-rail"));
+      if (entry) entry.focus({ focusVisible: true });
     }
   });
   const label = document.createElement("span");
@@ -1249,6 +1249,7 @@ const appendSubtitleOptionRow = option => {
   const row = document.createElement("button");
   row.type = "button";
   row.className = `track-row subtitle-option-row${selected ? " selected" : ""}`;
+  row.dataset.focusKey = `option:${option.id}`;
   row.addEventListener("click", event => {
     event.stopPropagation();
     pendingSubtitleOptionId = option.id;
@@ -1309,6 +1310,10 @@ const appendSubtitleOptionsEmptyState = (label, fetch = false) => {
 };
 
 const renderSubtitleSelectionRails = () => {
+  // The rows are rebuilt (on every pick and every state push): a focused row passes its focus on to its new copy.
+  const focused = document.activeElement;
+  const focusKey = subtitleModal.contains(focused) ? focused.dataset.focusKey : undefined;
+  const focusVisible = Boolean(focusKey) && focused.matches(":focus-visible");
   const options = subtitleSelectionOptions();
   const languages = subtitleLanguages();
   const selected = selectedSubtitleOption(options);
@@ -1337,6 +1342,10 @@ const renderSubtitleSelectionRails = () => {
   subtitleStyleRail.hidden = !styleVisible;
   subtitleStyleRail.parentElement.classList.toggle("style-visible", styleVisible);
   if (styleVisible) renderSubtitleStylePanel();
+  if (focusKey) {
+    const row = Array.from(subtitleModal.querySelectorAll("[data-focus-key]")).find(el => el.dataset.focusKey === focusKey);
+    if (row) row.focus({ focusVisible });
+  }
 };
 
 const formatDelay = delayMs => {
