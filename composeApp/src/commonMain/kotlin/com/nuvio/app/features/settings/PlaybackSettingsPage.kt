@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
@@ -72,6 +73,7 @@ import com.nuvio.app.features.player.IosTargetPrimaries
 import com.nuvio.app.features.player.IosTargetTransfer
 import com.nuvio.app.features.player.PlayerSettingsRepository
 import com.nuvio.app.features.player.STREAM_AUTO_PLAY_TIMEOUT_VALUES
+import com.nuvio.app.features.player.STREAM_REUSE_LAST_LINK_FOREVER_HOURS
 import com.nuvio.app.features.player.SubtitleBackgroundColorSwatches
 import com.nuvio.app.features.player.SubtitleColorSwatches
 import com.nuvio.app.features.player.SubtitleLanguageOption
@@ -2012,6 +2014,7 @@ private fun PlaybackSettingsSection(
 
 @Composable
 private fun formatReuseCacheDuration(hours: Int): String = when {
+    hours == STREAM_REUSE_LAST_LINK_FOREVER_HOURS -> stringResource(Res.string.settings_playback_duration_forever)
     hours < 24 && hours == 1 -> stringResource(Res.string.settings_playback_duration_hour_one, hours)
     hours < 24 -> stringResource(Res.string.settings_playback_duration_hours, hours)
     hours % 24 == 0 -> {
@@ -2163,30 +2166,79 @@ private fun ReuseCacheDurationDialog(
     onDurationSelected: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val options = listOf(1, 2, 3, 6, 12, 24, 48, 72, 168)
+    val selectedForever = selectedHours == STREAM_REUSE_LAST_LINK_FOREVER_HOURS
+    var forever by remember { mutableStateOf(selectedForever) }
+    var inDays by remember { mutableStateOf(selectedForever || selectedHours % 24 == 0) }
+    var amount by remember {
+        mutableStateOf(
+            when {
+                selectedForever -> "1"
+                selectedHours % 24 == 0 -> (selectedHours / 24).toString()
+                else -> selectedHours.toString()
+            },
+        )
+    }
+    val hours = amount.toIntOrNull()?.takeIf { it > 0 }?.let { if (inDays) it * 24 else it }
 
     DialogSurface(
         onDismissRequest = onDismiss,
         title = stringResource(Res.string.settings_playback_last_link_cache_duration),
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            options.forEach { hours ->
-                val isSelected = hours == selectedHours
+        SettingsSwitchRow(
+            title = stringResource(Res.string.settings_playback_duration_forever),
+            checked = forever,
+            isTablet = false,
+            horizontalPadding = 0.dp,
+            onCheckedChange = { forever = it },
+        )
+        if (!forever) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Surface(
+                    modifier = Modifier.width(88.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f)),
+                ) {
+                    BasicTextField(
+                        value = amount,
+                        onValueChange = { value -> if (value.length <= 4 && value.all(Char::isDigit)) amount = value },
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                        ),
+                        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    )
+                }
                 DialogOption(
-                    text = formatReuseCacheDuration(hours),
-                    selected = isSelected,
-                    onClick = { onDurationSelected(hours) },
+                    text = stringResource(Res.string.settings_playback_duration_unit_hours),
+                    selected = !inDays,
+                    onClick = { inDays = false },
+                    modifier = Modifier.weight(1f),
+                )
+                DialogOption(
+                    text = stringResource(Res.string.settings_playback_duration_unit_days),
+                    selected = inDays,
+                    onClick = { inDays = true },
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
 
         DialogButtons {
             DialogButton(
-                text = stringResource(Res.string.action_done),
+                text = stringResource(Res.string.action_cancel),
                 onClick = onDismiss,
+            )
+            DialogButton(
+                text = stringResource(Res.string.action_save),
+                onClick = { onDurationSelected(if (forever) STREAM_REUSE_LAST_LINK_FOREVER_HOURS else hours ?: return@DialogButton) },
+                style = DialogButtonStyle.Primary,
+                enabled = forever || hours != null,
             )
         }
     }
