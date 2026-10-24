@@ -179,6 +179,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
             )
             controlsVisible = !playerControlsLocked
             initialLoadCompleted = true
+            removeFailedStreamFromCache()
         }
     }
 
@@ -192,6 +193,7 @@ internal fun PlayerScreenRuntime.BindPlayerRuntimeEffects() {
             initialLoadCompleted = true
             errorMessage = getString(Res.string.player_error_torrent, state.message)
             controlsVisible = !playerControlsLocked
+            removeFailedStreamFromCache()
         }
     }
 
