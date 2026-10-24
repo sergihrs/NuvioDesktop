@@ -14,6 +14,9 @@ val STREAM_AUTO_PLAY_TIMEOUT_VALUES: List<Int> = listOf(
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, Int.MAX_VALUE
 )
 
+/** Reuse Last Link cache duration that never expires; a link is still forgotten when it fails to play. */
+const val STREAM_REUSE_LAST_LINK_FOREVER_HOURS: Int = Int.MAX_VALUE
+
 /**
  * Snaps [value] to the nearest allowed timeout value in [STREAM_AUTO_PLAY_TIMEOUT_VALUES].
  * Ties break to the lower value. Negative values snap to 0.

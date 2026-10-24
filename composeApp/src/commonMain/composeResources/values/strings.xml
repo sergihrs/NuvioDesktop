@@ -1122,8 +1122,11 @@
     <string name="settings_playback_dialog_save_close">Tap outside to save &amp; close</string>
     <string name="settings_playback_duration_day_one">%1$d day</string>
     <string name="settings_playback_duration_days">%1$d days</string>
+    <string name="settings_playback_duration_forever">Forever</string>
     <string name="settings_playback_duration_hour_one">%1$d hour</string>
     <string name="settings_playback_duration_hours">%1$d hours</string>
+    <string name="settings_playback_duration_unit_days">Days</string>
+    <string name="settings_playback_duration_unit_hours">Hours</string>
     <string name="settings_playback_enable_libass">Use libass for ASS/SSA subtitles</string>
     <string name="settings_playback_enable_libass_description">Experimental: advanced ASS/SSA rendering (styles, positioning, animations)</string>
     <string name="settings_playback_external_player">External Player</string>
